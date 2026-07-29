@@ -1,0 +1,387 @@
+// AlphasAxis Super App — core schema (Phase A: identity, KYC, cases, points ledger)
+// Money-adjacent entities (Commission, PayoutRequest, Dispute) are modeled now
+// even though Phase A's UI doesn't expose them yet, so no later migration is needed.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  AGENT
+  AGENCY
+  ADMIN
+}
+
+enum KycStatus {
+  NOT_SUBMITTED
+  PENDING
+  VERIFIED
+  MISMATCH
+}
+
+enum KycDocType {
+  NRIC_PASSPORT
+  SELFIE
+  PROOF_OF_ADDRESS
+}
+
+enum KycDocStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum NftTier {
+  AXIS_ZERO
+  AXIS_ONE
+  AXIS_PRO
+  AXIS_PRESTIGE
+}
+
+enum CaseStatus {
+  SUBMITTED
+  ASSIGNED
+  DOCS
+  REVIEW
+  APPROVED
+  DISBURSED
+  FLAGGED
+}
+
+enum FinancingType {
+  MORTGAGE
+  HIRE_PURCHASE
+  PERSONAL
+  BUSINESS
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum PointsReason {
+  SPEND_TO_EARN
+  SUBMIT_TO_EARN
+  NETWORK_TO_EARN
+  SOCIAL_TO_EARN
+  CONSULTATION
+  REFERRAL_BONUS
+  VOUCHER_REDEMPTION
+  ADMIN_ADJUST
+}
+
+enum AgencyAgentStatus {
+  INVITED
+  ACTIVE
+  REMOVED
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+enum PayoutStatus {
+  REQUESTED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum DisputeStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  phone         String?
+  role          Role      @default(USER)
+  referralCode  String    @unique
+  referredById  String?
+  referredBy    User?     @relation("Referrals", fields: [referredById], references: [id])
+  referredUsers User[]    @relation("Referrals")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions        Session[]
+  kycSubmission   KycSubmission?
+  nftHoldings     NftHolding[]
+  agentProfile    AgentProfile?
+  ownedAgency     Agency?              @relation("AgencyOwner")
+  agencyAgentRows AgencyAgent[]        @relation("AgencyAgentUser")
+  applicantCases  Case[]               @relation("CaseApplicant")
+  caseEvents      CaseEvent[]
+  documents       Document[]           @relation("DocumentUploader")
+  reviewedDocs    Document[]           @relation("DocumentReviewer")
+  reviewedKyc     KycSubmission[]      @relation("KycReviewer")
+  pointsLedger    PointsLedgerEntry[]
+  receiptUploads  ReceiptUpload[]
+  checkIns        CheckIn[]
+  orders          Order[]
+  payoutRequests  PayoutRequest[]
+  disputesRaised  Dispute[]            @relation("DisputeRaisedBy")
+  disputesHandled Dispute[]            @relation("DisputeResolvedBy")
+  roleApplications RoleApplication[]
+
+  @@index([role])
+}
+
+// Database session, per Auth.js Credentials + database-session pattern.
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+}
+
+model AgentProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agencyId          String?
+  agency            Agency?  @relation(fields: [agencyId], references: [id])
+  conversionScore   Int      @default(0)
+  responseTimeScore Int      @default(0)
+  complianceScore   Int      @default(0)
+  trainingScore     Int      @default(0)
+  updatedAt         DateTime @updatedAt
+
+  assignedCases Case[] @relation("CaseAgent")
+}
+
+model Agency {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String   @unique
+  owner     User     @relation("AgencyOwner", fields: [ownerId], references: [id])
+  createdAt DateTime @default(now())
+
+  agents      AgentProfile[]
+  agencyAgent AgencyAgent[]
+  commissions Commission[]
+}
+
+model AgencyAgent {
+  id        String            @id @default(cuid())
+  agencyId  String
+  agency    Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation("AgencyAgentUser", fields: [userId], references: [id])
+  status    AgencyAgentStatus @default(INVITED)
+  invitedAt DateTime          @default(now())
+
+  @@unique([agencyId, userId])
+}
+
+model KycSubmission {
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         KycStatus     @default(NOT_SUBMITTED)
+  reviewedById   String?
+  reviewer       User?         @relation("KycReviewer", fields: [reviewedById], references: [id])
+  reviewedAt     DateTime?
+  rejectionReason String?
+  submittedAt    DateTime?
+  createdAt      DateTime      @default(now())
+
+  documents KycDocument[]
+}
+
+model KycDocument {
+  id              String        @id @default(cuid())
+  kycSubmissionId String
+  kycSubmission   KycSubmission @relation(fields: [kycSubmissionId], references: [id], onDelete: Cascade)
+  docType         KycDocType
+  blobPath        String
+  status          KycDocStatus  @default(PENDING)
+  uploadedAt      DateTime      @default(now())
+}
+
+model NftHolding {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier       NftTier
+  multiplier Float
+  chain      String   @default("off-chain") // beta default: off-chain record, see plan risk flag on chain confirmation
+  mintedAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Case {
+  id            String        @id @default(cuid())
+  applicantId   String
+  applicant     User          @relation("CaseApplicant", fields: [applicantId], references: [id])
+  agentId       String?
+  agent         AgentProfile? @relation("CaseAgent", fields: [agentId], references: [id])
+  financingType FinancingType
+  amount        Decimal       @db.Decimal(14, 2)
+  status        CaseStatus    @default(SUBMITTED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  events      CaseEvent[]
+  documents   Document[]
+  commissions Commission[]
+
+  @@index([applicantId])
+  @@index([agentId])
+  @@index([status])
+}
+
+model CaseEvent {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  type      String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+}
+
+model Document {
+  id           String         @id @default(cuid())
+  caseId       String?
+  case         Case?          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploaderId   String
+  uploader     User           @relation("DocumentUploader", fields: [uploaderId], references: [id])
+  docType      String
+  blobPath     String
+  status       DocumentStatus @default(PENDING)
+  reviewedById String?
+  reviewer     User?          @relation("DocumentReviewer", fields: [reviewedById], references: [id])
+  createdAt    DateTime       @default(now())
+
+  @@index([caseId])
+}
+
+model PointsLedgerEntry {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Int
+  reason    PointsReason
+  refId     String?
+  createdAt DateTime     @default(now())
+
+  @@index([userId])
+}
+
+model ReceiptUpload {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blobPath      String
+  status        DocumentStatus @default(PENDING)
+  pointsAwarded Int?
+  createdAt     DateTime @default(now())
+}
+
+model CheckIn {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date         DateTime @db.Date
+  streakCount  Int
+
+  @@unique([userId, date])
+}
+
+model Voucher {
+  id          String  @id @default(cuid())
+  title       String
+  description String
+  costPoints  Int
+  active      Boolean @default(true)
+
+  orders Order[]
+}
+
+model Order {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voucherId String
+  voucher   Voucher  @relation(fields: [voucherId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Commission {
+  id           String            @id @default(cuid())
+  caseId       String
+  case         Case              @relation(fields: [caseId], references: [id])
+  agentId      String
+  agencyId     String?
+  agency       Agency?           @relation(fields: [agencyId], references: [id])
+  amount       Decimal           @db.Decimal(14, 2)
+  status       CommissionStatus  @default(PENDING)
+  approvedById String?
+  computedAt   DateTime          @default(now())
+
+  @@index([caseId])
+}
+
+model PayoutRequest {
+  id           String       @id @default(cuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  amount       Decimal      @db.Decimal(14, 2)
+  status       PayoutStatus @default(REQUESTED)
+  approvedById String?
+  paidAt       DateTime?
+  createdAt    DateTime     @default(now())
+}
+
+model RoleApplication {
+  id            String             @id @default(cuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestedRole Role
+  agencyName    String?
+  status        ApplicationStatus  @default(PENDING)
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime           @default(now())
+
+  @@index([userId])
+}
+
+model Dispute {
+  id             String        @id @default(cuid())
+  raisedById     String
+  raisedBy       User          @relation("DisputeRaisedBy", fields: [raisedById], references: [id])
+  subjectType    String
+  subjectId      String
+  note           String
+  status         DisputeStatus @default(OPEN)
+  resolutionNote String?
+  resolvedById   String?
+  resolvedBy     User?         @relation("DisputeResolvedBy", fields: [resolvedById], references: [id])
+  createdAt      DateTime      @default(now())
+}
