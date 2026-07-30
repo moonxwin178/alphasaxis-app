@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { verifySession } from "@/lib/session";
 
@@ -14,8 +15,8 @@ export default async function PublicLayout({ children }: { children: React.React
 
   return (
     <div className="mx-auto min-h-screen max-w-[420px] px-4 py-10">
-      <div className="mb-8 text-center">
-        <span className="text-[20px] font-[800] gold-text">ALPHASAXIS</span>
+      <div className="mb-8 flex justify-center">
+        <Image src="/logo.png" alt="AlphasAxis" width={180} height={22} className="h-[22px] w-auto" priority />
       </div>
       {children}
     </div>
