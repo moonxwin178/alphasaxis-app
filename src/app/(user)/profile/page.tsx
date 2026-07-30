@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { ReferralCodeBox } from "@/components/ReferralCodeBox";
 import { LogoutButton } from "@/components/LogoutButton";
 import { RoleApplicationForm } from "@/components/RoleApplicationForm";
+import { TierRing } from "@/components/TierRing";
 import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
 
 const KYC_BADGE: Record<string, string> = {
@@ -67,9 +68,7 @@ export default async function ProfilePage() {
         <p className="eyebrow mt-3.5">My NFT</p>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="tier-ring">
-              <div className="inner">{nftHolding ? TIER_LABEL[nftHolding.tier] : "None"}</div>
-            </div>
+            <TierRing tier={nftHolding?.tier ?? null} />
             <div className="min-w-0 flex-1">
               <p className="row-title">{nftHolding ? TIER_LABEL[nftHolding.tier] : "No NFT minted yet"}</p>
               <p className="row-sub">

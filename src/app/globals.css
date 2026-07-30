@@ -106,7 +106,7 @@ body {
 .tracker-labels span:first-child { text-align: left; }
 .tracker-labels span:last-child { text-align: right; }
 
-.tier-ring { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--gold-light), var(--gold)); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.tier-ring { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--gold-light), var(--gold)); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; position: relative; overflow: hidden; }
 .tier-ring .inner { width: 40px; height: 40px; border-radius: 50%; background: var(--card); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: var(--gold-light); text-align: center; line-height: 1.1; }
 .tier-ring.lg { width: 64px; height: 64px; }
 .tier-ring.lg .inner { width: 54px; height: 54px; font-size: 10.5px; }

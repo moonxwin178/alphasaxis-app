@@ -15,9 +15,12 @@ const visby = localFont({
 });
 
 const title = "AlphasAxis App";
-const description = "The AlphasAxis Super App — cases, rewards, wallet and more.";
+const description =
+  "Track financing cases, earn $AXIS, and manage your founding node — the AlphasAxis Super App in one place.";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://app.alphasaxis.com"),
+  applicationName: "AlphasAxis",
   title: { default: title, template: "%s — AlphasAxis" },
   description,
   icons: {
@@ -28,6 +31,18 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "AlphasAxis",
+  },
+  openGraph: {
+    type: "website",
+    url: "https://app.alphasaxis.com",
+    siteName: "AlphasAxis",
+    title,
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
   },
 };
 

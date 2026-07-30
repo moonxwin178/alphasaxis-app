@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
+import { TierRing } from "@/components/TierRing";
 import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
 
 export default async function AgencyNftPage() {
@@ -18,9 +19,7 @@ export default async function AgencyNftPage() {
       <AppHeader title="NFT Privileges" />
       <div className="px-4 pt-4">
         <div className="card flex items-center gap-3.5 p-4">
-          <div className="tier-ring lg">
-            <div className="inner">{nftHolding ? TIER_LABEL[nftHolding.tier] : "None"}</div>
-          </div>
+          <TierRing tier={nftHolding?.tier ?? null} lg />
           <div>
             <p className="row-title text-[15px]">{agency?.name ?? "Your agency"}</p>
             <p className="row-sub">

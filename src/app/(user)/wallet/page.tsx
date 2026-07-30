@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { getPointsBalance } from "@/lib/points";
@@ -33,7 +34,10 @@ export default async function WalletPage() {
       <div className="px-4 pt-4">
         <div className="stat-grid">
           <div className="stat">
-            <div className="label">$AXIS points</div>
+            <div className="label flex items-center gap-1.5">
+              <Image src="/nft/token.png" alt="$AXIS" width={14} height={14} className="rounded-full" />
+              $AXIS points
+            </div>
             <div className="value">{balance.toLocaleString()}</div>
           </div>
           <div className="stat">

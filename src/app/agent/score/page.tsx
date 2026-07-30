@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
+import { TierRing } from "@/components/TierRing";
 import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
 
 export default async function AgentScorePage() {
@@ -47,9 +48,7 @@ export default async function AgentScorePage() {
       <AppHeader title="Performance Score" />
       <div className="px-4 pt-4">
         <div className="card flex items-center gap-3.5 p-3.5">
-          <div className="tier-ring lg">
-            <div className="inner">{tier ? TIER_LABEL[tier] : "None"}</div>
-          </div>
+          <TierRing tier={tier} lg />
           <div className="text-left">
             <p className="row-title text-[15px]">{totalCases} cases handled</p>
             <p className="row-sub">

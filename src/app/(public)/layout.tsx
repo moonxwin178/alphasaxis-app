@@ -14,7 +14,7 @@ export default async function PublicLayout({ children }: { children: React.React
   if (user) redirect(HOME_BY_ROLE[user.role] ?? "/cases");
 
   return (
-    <div className="mx-auto min-h-screen max-w-[420px] px-4 py-10">
+    <div className="mx-auto flex min-h-screen max-w-[420px] flex-col justify-center px-4 py-10">
       <div className="mb-8 flex justify-center">
         <Image src="/logo.png" alt="AlphasAxis" width={180} height={22} className="h-[22px] w-auto" priority />
       </div>

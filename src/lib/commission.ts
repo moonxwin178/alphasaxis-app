@@ -24,6 +24,13 @@ export const TIER_LABEL: Record<NftTier, string> = {
   AXIS_PRESTIGE: "AxisPrestige",
 };
 
+export const TIER_IMAGE: Record<NftTier, string> = {
+  AXIS_ZERO: "/nft/axiszero.png",
+  AXIS_ONE: "/nft/axisone.png",
+  AXIS_PRO: "/nft/axispro.png",
+  AXIS_PRESTIGE: "/nft/axisprestige.png",
+};
+
 /** Rounds to 2dp — commission amounts are currency, never leak float noise to the UI or DB. */
 export function computeCommission(caseAmount: number, financingType: FinancingType, tier: NftTier | null): number {
   const base = caseAmount * RATE_BY_FINANCING_TYPE[financingType];
