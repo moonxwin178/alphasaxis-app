@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { RoleApplicationForm } from "@/components/RoleApplicationForm";
 import { TierRing } from "@/components/TierRing";
 import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
+import { getWalletBalance } from "@/lib/wallet";
 
 const KYC_BADGE: Record<string, string> = {
   NOT_SUBMITTED: '<span class="badge amber">Not submitted</span>',
@@ -19,12 +20,21 @@ export default async function ProfilePage() {
   const user = await requireRole("USER");
   const prisma = getPrisma();
 
-  const [self, kyc, pendingApplication, nftHolding] = await Promise.all([
+  const [self, kyc, pendingApplication, nftHolding, pendingNodeClaim, walletBalance] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
     prisma.kycSubmission.findUnique({ where: { userId: user.id } }),
     prisma.roleApplication.findFirst({ where: { userId: user.id, status: "PENDING" } }),
-    prisma.nftHolding.findFirst({ where: { userId: user.id }, orderBy: { multiplier: "desc" } }),
+    prisma.nftHolding.findFirst({
+      where: { userId: user.id, verificationStatus: "VERIFIED" },
+      orderBy: { multiplier: "desc" },
+    }),
+    prisma.nftHolding.findFirst({
+      where: { userId: user.id, tier: "AXIS_PRESTIGE", verificationStatus: "PENDING" },
+    }),
+    getWalletBalance(user.id),
   ]);
+  const currentTier = nftHolding?.tier ?? "AXIS_ZERO";
+  const hasPrestige = nftHolding?.tier === "AXIS_PRESTIGE";
 
   const initials = self.name
     .split(" ")
@@ -36,8 +46,8 @@ export default async function ProfilePage() {
   return (
     <div>
       <AppHeader title="My Profile" />
-      <div className="px-4 pt-4">
-        <div className="card flex items-center gap-3">
+      <div className="flex flex-col gap-4 px-4 pt-4">
+        <div className="card !mb-0 flex items-center gap-3">
           <div className="tier-ring">
             <div className="inner">{initials}</div>
           </div>
@@ -49,50 +59,69 @@ export default async function ProfilePage() {
 
         <ReferralCodeBox code={self.referralCode} />
 
-        <p className="eyebrow mt-6">Settings</p>
-        <div className="row">
-          <div className="row-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
-              <path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z" />
-            </svg>
+        <div>
+          <p className="eyebrow">Settings</p>
+          <div className="row">
+            <div className="row-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
+                <path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="row-title">KYC status</p>
+            </div>
+            <div
+              className="row-right"
+              dangerouslySetInnerHTML={{ __html: KYC_BADGE[kyc?.status ?? "NOT_SUBMITTED"] }}
+            />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="row-title">KYC status</p>
-          </div>
-          <div
-            className="row-right"
-            dangerouslySetInnerHTML={{ __html: KYC_BADGE[kyc?.status ?? "NOT_SUBMITTED"] }}
-          />
         </div>
 
-        <p className="eyebrow mt-6">My NFT</p>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <TierRing tier={nftHolding?.tier ?? null} />
-            <div className="min-w-0 flex-1">
-              <p className="row-title">{nftHolding ? TIER_LABEL[nftHolding.tier] : "No NFT minted yet"}</p>
+        <div>
+          <p className="eyebrow">My NFT</p>
+          <div className="card !mb-0">
+            <div className="flex items-center gap-3">
+              <TierRing tier={currentTier} />
+              <div className="min-w-0 flex-1">
+                <p className="row-title">{TIER_LABEL[currentTier]}</p>
+                <p className="row-sub">{TIER_MULTIPLIER[currentTier]}x Agent2Mine multiplier</p>
+              </div>
+            </div>
+            {currentTier === "AXIS_ZERO" && (
+              <p className="p-note mt-2.5 !mb-0">
+                Every account starts here automatically — no minting needed. AxisOne unlocks the
+                moment you activate Agent below, AxisPro once your Agency mint is approved.
+              </p>
+            )}
+            {pendingNodeClaim && (
+              <p className="p-note mt-2.5 !mb-0">
+                AxisPrestige verification for wallet{" "}
+                {pendingNodeClaim.walletAddress?.slice(0, 6)}…{pendingNodeClaim.walletAddress?.slice(-4)}{" "}
+                is pending admin review.
+              </p>
+            )}
+            {!hasPrestige && !pendingNodeClaim && (
+              <Link href="/nft-verification?return=/profile" className="btn secondary mt-2.5 !mb-0">
+                Verify an AxisPrestige Node
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <p className="eyebrow">Grow with AlphasAxis</p>
+          {pendingApplication ? (
+            <div className="card !mb-0">
+              <p className="row-title mb-1">Application submitted</p>
               <p className="row-sub">
-                {nftHolding ? `${TIER_MULTIPLIER[nftHolding.tier]}x Agent2Mine multiplier` : "Mint one to unlock earning multipliers"}
+                Your {pendingApplication.requestedRole.toLowerCase()} mint fee has been deducted and is
+                under admin review — refunded automatically if declined.
               </p>
             </div>
-          </div>
-          <Link href="/nft-verification?return=/profile" className="btn secondary mt-2.5">
-            {nftHolding ? "Upgrade NFT" : "Mint NFT"}
-          </Link>
+          ) : (
+            <RoleApplicationForm walletBalance={walletBalance} />
+          )}
         </div>
-
-        <p className="eyebrow mt-6">Grow with AlphasAxis</p>
-        {pendingApplication ? (
-          <div className="card">
-            <p className="row-title mb-1">Application submitted</p>
-            <p className="row-sub">
-              Your {pendingApplication.requestedRole.toLowerCase()} application is under review. We&apos;ll
-              notify you once it&apos;s approved.
-            </p>
-          </div>
-        ) : (
-          <RoleApplicationForm />
-        )}
 
         <LogoutButton />
       </div>

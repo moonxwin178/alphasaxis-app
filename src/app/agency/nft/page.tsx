@@ -10,20 +10,26 @@ export default async function AgencyNftPage() {
   const prisma = getPrisma();
 
   const [nftHolding, agency] = await Promise.all([
-    prisma.nftHolding.findFirst({ where: { userId: owner.id }, orderBy: { multiplier: "desc" } }),
+    prisma.nftHolding.findFirst({
+      where: { userId: owner.id, verificationStatus: "VERIFIED" },
+      orderBy: { multiplier: "desc" },
+    }),
     prisma.agency.findUnique({ where: { ownerId: owner.id } }),
   ]);
+  const hasPrestige = nftHolding?.tier === "AXIS_PRESTIGE";
 
   return (
     <div>
       <AppHeader title="NFT Privileges" />
       <div className="px-4 pt-4">
         <div className="card flex items-center gap-3.5 p-4">
-          <TierRing tier={nftHolding?.tier ?? null} lg />
+          <TierRing tier={nftHolding?.tier ?? "AXIS_ZERO"} lg />
           <div>
             <p className="row-title text-[15px]">{agency?.name ?? "Your agency"}</p>
             <p className="row-sub">
-              {nftHolding ? `${TIER_LABEL[nftHolding.tier]} · ${TIER_MULTIPLIER[nftHolding.tier]}x multiplier` : "No NFT minted yet"}
+              {nftHolding
+                ? `${TIER_LABEL[nftHolding.tier]} · ${TIER_MULTIPLIER[nftHolding.tier]}x multiplier`
+                : `${TIER_LABEL.AXIS_ZERO} · ${TIER_MULTIPLIER.AXIS_ZERO}x multiplier`}
             </p>
           </div>
         </div>
@@ -66,9 +72,11 @@ export default async function AgencyNftPage() {
           </div>
         </div>
 
-        <Link href="/nft-verification?return=/agency/nft" className="btn primary mt-3">
-          {nftHolding ? "Upgrade Node" : "Mint Node"}
-        </Link>
+        {!hasPrestige && (
+          <Link href="/nft-verification?return=/agency/nft" className="btn primary mt-3">
+            Verify an AxisPrestige Node
+          </Link>
+        )}
       </div>
     </div>
   );

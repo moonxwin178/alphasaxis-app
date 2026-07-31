@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { redeemVoucher } from "@/app/actions/market";
 
@@ -15,9 +15,9 @@ const ICON_STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.8 } a
 
 const SERVICES = [
   {
+    slug: "legal-document-prep",
     title: "Legal document preparation",
     sub: "Per case",
-    note: "Discuss with your consultant",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
         <path d="M7 3h7l5 5v13H7z" />
@@ -26,9 +26,9 @@ const SERVICES = [
     ),
   },
   {
+    slug: "property-valuation",
     title: "Property valuation report",
     sub: "Certified valuer",
-    note: "Discuss with your consultant",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
         <circle cx="10.5" cy="10.5" r="6.5" />
@@ -37,9 +37,9 @@ const SERVICES = [
     ),
   },
   {
+    slug: "credit-report-pull",
     title: "Credit report pull",
     sub: "CCRIS + CTOS",
-    note: "Discuss with your consultant",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
         <path d="M4 20V10M11 20V4M18 20v-7" />
@@ -47,9 +47,9 @@ const SERVICES = [
     ),
   },
   {
+    slug: "insurance-bundling",
     title: "Insurance bundling",
     sub: "MRTA / fire insurance",
-    note: "Discuss with your consultant",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
         <path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z" />
@@ -58,10 +58,10 @@ const SERVICES = [
   },
 ];
 
-const RWA_CATEGORIES = [
+const RWA_CATEGORIES: { title: string; desc: string; icon: ReactNode; iconColor?: string }[] = [
   {
     title: "Tokenized Stocks",
-    desc: "Fractional shares in listed equities",
+    desc: "e.g. SpaceX, Micron — via issuers like Ondo & Jupiter",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
         <path d="M3 17l6-6 4 4 8-8" />
@@ -84,18 +84,21 @@ const RWA_CATEGORIES = [
     desc: "Fractional, vault-backed bullion",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M8 12h8M12 8v8" />
+        <rect x="3" y="9" width="18" height="9" rx="1.5" />
+        <path d="M6 9l2.2-4h7.6L18 9" />
+        <path d="M9.5 13.5h5" />
       </svg>
     ),
   },
   {
     title: "Tokenized Silver",
     desc: "Fractional, vault-backed bullion",
+    iconColor: "#C7CDD6",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M9 9l6 6M15 9l-6 6" />
+        <rect x="3" y="9" width="18" height="9" rx="1.5" />
+        <path d="M6 9l2.2-4h7.6L18 9" />
+        <path d="M9.5 13.5h5" />
       </svg>
     ),
   },
@@ -132,13 +135,17 @@ export function MarketTabs({ vouchers, pointsBalance }: { vouchers: VoucherView[
 
       {tab === "services" &&
         SERVICES.map((s) => (
-          <Link key={s.title} href="/consultation" className="row">
+          <Link key={s.slug} href={`/market/services/${s.slug}`} className="row">
             <div className="row-icon">{s.icon}</div>
             <div className="min-w-0 flex-1">
               <p className="row-title">{s.title}</p>
               <p className="row-sub">{s.sub}</p>
             </div>
-            <div className="row-right">{s.note}</div>
+            <div className="chev">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </div>
           </Link>
         ))}
 
@@ -178,15 +185,17 @@ export function MarketTabs({ vouchers, pointsBalance }: { vouchers: VoucherView[
       )}
 
       {tab === "rwa" && (
-        <div>
-          <p className="p-note">
+        <div className="flex flex-col gap-4">
+          <p className="p-note !mb-0">
             Real-world assets — brought on-chain by verified issuers, minted against $AXIS and
             stablecoins. Launching in Phase 4, once token utility and governance are live.
           </p>
           <div className="grid2">
             {RWA_CATEGORIES.map((c) => (
               <div key={c.title} className="card !mb-0 flex flex-col gap-2">
-                <div className="card-icon !m-0">{c.icon}</div>
+                <div className="card-icon !m-0" style={c.iconColor ? { color: c.iconColor } : undefined}>
+                  {c.icon}
+                </div>
                 <div>
                   <p className="row-title">{c.title}</p>
                   <p className="row-sub">{c.desc}</p>

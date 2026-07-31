@@ -3,6 +3,7 @@ import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { AdminKycRow } from "@/components/AdminKycRow";
 import { AdminRoleAppRow } from "@/components/AdminRoleAppRow";
+import { AdminTopUpRow } from "@/components/AdminTopUpRow";
 
 const STATUS_BADGE: Record<string, string> = {
   VERIFIED: '<span class="badge green">Approved</span>',
@@ -13,7 +14,7 @@ export default async function AdminUsersPage() {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
-  const [submissions, roleApplications] = await Promise.all([
+  const [submissions, roleApplications, topUpRequests] = await Promise.all([
     prisma.kycSubmission.findMany({
       where: { status: { in: ["PENDING", "VERIFIED", "MISMATCH"] } },
       include: { user: { select: { name: true, email: true } }, documents: true },
@@ -21,6 +22,11 @@ export default async function AdminUsersPage() {
       take: 30,
     }),
     prisma.roleApplication.findMany({
+      where: { status: "PENDING" },
+      include: { user: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.walletTopUpRequest.findMany({
       where: { status: "PENDING" },
       include: { user: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
@@ -41,6 +47,22 @@ export default async function AdminUsersPage() {
                 name={a.user.name}
                 requestedRole={a.requestedRole}
                 agencyName={a.agencyName}
+              />
+            ))}
+          </>
+        )}
+
+        {topUpRequests.length > 0 && (
+          <>
+            <p className="eyebrow mt-2">Wallet top-ups</p>
+            {topUpRequests.map((r) => (
+              <AdminTopUpRow
+                key={r.id}
+                requestId={r.id}
+                name={r.user.name}
+                amountUsd={Number(r.amountUsd)}
+                method={r.method}
+                note={r.note}
               />
             ))}
           </>

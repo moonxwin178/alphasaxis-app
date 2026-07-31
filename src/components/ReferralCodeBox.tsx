@@ -13,7 +13,7 @@ export function ReferralCodeBox({ code }: { code: string }) {
   }
 
   return (
-    <div className="card mt-2">
+    <div className="card !mb-0">
       <p className="row-title">Your referral code</p>
       <button
         type="button"

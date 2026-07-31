@@ -75,6 +75,55 @@ enum PointsReason {
   CONSULTATION
   REFERRAL_BONUS
   VOUCHER_REDEMPTION
+  SERVICE_REQUEST
+  ADMIN_ADJUST
+}
+
+enum ServicePaymentMethod {
+  RM
+  USDT
+  AXIS_POINTS
+}
+
+enum ServiceRequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}
+
+enum NftVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CommissionTier {
+  TIER_1
+  TIER_2
+}
+
+enum MembershipCommissionStatus {
+  PENDING
+  PAID
+}
+
+enum WalletTopUpMethod {
+  RM
+  USDT
+}
+
+enum WalletTopUpStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WalletReason {
+  TOPUP
+  AGENT_MEMBERSHIP
+  AGENCY_MEMBERSHIP
+  AGENCY_MEMBERSHIP_REFUND
   ADMIN_ADJUST
 }
 
@@ -138,10 +187,15 @@ model User {
   receiptUploads  ReceiptUpload[]
   checkIns        CheckIn[]
   orders          Order[]
+  serviceRequests ServiceRequest[]
   payoutRequests  PayoutRequest[]
   disputesRaised  Dispute[]            @relation("DisputeRaisedBy")
   disputesHandled Dispute[]            @relation("DisputeResolvedBy")
   roleApplications RoleApplication[]
+  commissionsEarned MembershipCommission[] @relation("MembershipCommissionRecipient")
+  commissionsSourced MembershipCommission[] @relation("MembershipCommissionSource")
+  walletTopUps      WalletTopUpRequest[]
+  walletLedger      WalletLedgerEntry[]
 
   @@index([role])
 }
@@ -220,13 +274,15 @@ model KycDocument {
 }
 
 model NftHolding {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tier       NftTier
-  multiplier Float
-  chain      String   @default("off-chain") // beta default: off-chain record, see plan risk flag on chain confirmation
-  mintedAt   DateTime @default(now())
+  id                  String                 @id @default(cuid())
+  userId              String
+  user                User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier                NftTier
+  multiplier          Float
+  chain               String                 @default("off-chain") // beta default: off-chain record, see plan risk flag on chain confirmation
+  walletAddress       String? // set for AxisPrestige node claims, verified against app.turbox.bond/node-pad
+  verificationStatus  NftVerificationStatus  @default(VERIFIED) // node claims start PENDING until an admin confirms on-chain ownership
+  mintedAt            DateTime               @default(now())
 
   @@index([userId])
 }
@@ -332,6 +388,20 @@ model Order {
   createdAt DateTime @default(now())
 }
 
+model ServiceRequest {
+  id            String                @id @default(cuid())
+  userId        String
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceSlug   String
+  serviceTitle  String
+  paymentMethod ServicePaymentMethod
+  pointsCost    Int?
+  status        ServiceRequestStatus  @default(PENDING)
+  createdAt     DateTime              @default(now())
+
+  @@index([userId])
+}
+
 model Commission {
   id           String            @id @default(cuid())
   caseId       String
@@ -364,10 +434,62 @@ model RoleApplication {
   user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   requestedRole Role
   agencyName    String?
+  walletAddress String? // wallet used for the $500 (Agent) / $5,000 (Agency) USDT mint, pending real on-chain verification
   status        ApplicationStatus  @default(PENDING)
   reviewedById  String?
   reviewedAt    DateTime?
   createdAt     DateTime           @default(now())
+
+  @@index([userId])
+}
+
+// Records the 10% (Tier 1, direct referrer) / 5% (Tier 2, referrer's referrer)
+// USDT commission owed when a referred user mints Agent or Agency. Paid out
+// manually by an admin for now — see risk flag on custodial USDT payouts.
+model MembershipCommission {
+  id             String                      @id @default(cuid())
+  recipientId    String
+  recipient      User                        @relation("MembershipCommissionRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sourceUserId   String
+  sourceUser     User                        @relation("MembershipCommissionSource", fields: [sourceUserId], references: [id], onDelete: Cascade)
+  mintedRole     Role
+  tier           CommissionTier
+  usdtAmount     Decimal                     @db.Decimal(14, 2)
+  status         MembershipCommissionStatus  @default(PENDING)
+  createdAt      DateTime                    @default(now())
+
+  @@index([recipientId])
+}
+
+// A user's request to add real money to their in-app USD balance. Nothing is
+// actually charged here — no payment gateway is wired up yet. An admin
+// confirms the payment came in (bank transfer / USDT deposit) and approves,
+// which is what credits WalletLedgerEntry.
+model WalletTopUpRequest {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountUsd    Decimal             @db.Decimal(14, 2)
+  method       WalletTopUpMethod
+  note         String?
+  status       WalletTopUpStatus   @default(PENDING)
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime            @default(now())
+
+  @@index([userId])
+}
+
+// Append-only USD ledger — same idempotent pattern as PointsLedgerEntry.
+// Balance = SUM(delta). Only approved top-ups and membership spends land here.
+model WalletLedgerEntry {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Decimal       @db.Decimal(14, 2)
+  reason    WalletReason
+  refId     String?
+  createdAt DateTime      @default(now())
 
   @@index([userId])
 }

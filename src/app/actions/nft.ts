@@ -4,24 +4,45 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { TIER_MULTIPLIER } from "@/lib/commission";
-import type { NftTier } from "@/generated/prisma/client";
 
 export type NftFormState = { error?: string } | undefined;
 
-const VALID_TIERS: NftTier[] = ["AXIS_ZERO", "AXIS_ONE", "AXIS_PRO", "AXIS_PRESTIGE"];
+// AxisZero is automatic for every user (not minted). AxisOne/AxisPro are granted
+// automatically on Agent/Agency approval (see actions/roleApplication.ts) — neither
+// is self-mintable here. AxisPrestige requires node-wallet verification, below.
+export async function mintNftTier(): Promise<NftFormState> {
+  return { error: "This tier isn't self-mintable. See your profile for how to unlock it." };
+}
 
-export async function mintNftTier(tier: string): Promise<NftFormState> {
+/**
+ * AxisPrestige is proof of an already-minted Node NFT on app.turbox.bond/node-pad,
+ * not something minted in this app. This records the claim as PENDING — an admin
+ * still has to confirm on-chain ownership before it counts toward any multiplier.
+ */
+export async function submitNodeVerification(walletAddress: string): Promise<NftFormState> {
   const user = await requireUser();
-
-  if (!VALID_TIERS.includes(tier as NftTier)) return { error: "Invalid tier." };
+  const address = walletAddress.trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    return { error: "Enter a valid wallet address (0x…)." };
+  }
 
   const prisma = getPrisma();
+  const existing = await prisma.nftHolding.findFirst({
+    where: { userId: user.id, tier: "AXIS_PRESTIGE" },
+  });
+  if (existing) return { error: "You already have an AxisPrestige verification on file." };
+
   await prisma.nftHolding.create({
-    data: { userId: user.id, tier: tier as NftTier, multiplier: TIER_MULTIPLIER[tier as NftTier] },
+    data: {
+      userId: user.id,
+      tier: "AXIS_PRESTIGE",
+      multiplier: TIER_MULTIPLIER.AXIS_PRESTIGE,
+      chain: "unverified",
+      walletAddress: address,
+      verificationStatus: "PENDING",
+    },
   });
 
   revalidatePath("/profile");
-  revalidatePath("/agent/score");
-  revalidatePath("/agency/nft");
   return undefined;
 }

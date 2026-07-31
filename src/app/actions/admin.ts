@@ -19,7 +19,10 @@ export async function assignAgentToCase(caseId: string, agentProfileId: string):
 
   const [theCase, agentProfile] = await Promise.all([
     prisma.case.findUnique({ where: { id: caseId } }),
-    prisma.agentProfile.findUnique({ where: { id: agentProfileId }, include: { user: { include: { nftHoldings: true } } } }),
+    prisma.agentProfile.findUnique({
+      where: { id: agentProfileId },
+      include: { user: { include: { nftHoldings: { where: { verificationStatus: "VERIFIED" } } } } },
+    }),
   ]);
 
   if (!theCase) return { error: "Case not found." };
