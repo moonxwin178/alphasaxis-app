@@ -10,52 +10,12 @@ const HOME_BY_ROLE: Record<string, string> = {
   ADMIN: "/admin/users",
 };
 
-const ICON_STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.8 } as const;
-
-const FEATURES = [
-  {
-    label: "Cases",
-    desc: "Track financing end to end",
-    icon: (
-      <svg viewBox="0 0 24 24" {...ICON_STROKE}>
-        <path d="M3 7h18v12H3z" />
-        <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      </svg>
-    ),
-  },
-  {
-    label: "Rewards",
-    desc: "Earn $AXIS as you go",
-    icon: (
-      <svg viewBox="0 0 24 24" {...ICON_STROKE}>
-        <circle cx="8" cy="8" r="5.5" />
-        <circle cx="15" cy="15.5" r="5.5" />
-      </svg>
-    ),
-  },
-  {
-    label: "Wallet",
-    desc: "Your balance, always visible",
-    icon: (
-      <svg viewBox="0 0 24 24" {...ICON_STROKE}>
-        <rect x="3" y="6" width="18" height="13" rx="2" />
-        <path d="M3 10h18" />
-        <circle cx="16.5" cy="14" r="1" />
-      </svg>
-    ),
-  },
-  {
-    label: "Marketplace",
-    desc: "Services, vouchers & assets",
-    icon: (
-      <svg viewBox="0 0 24 24" {...ICON_STROKE}>
-        <path d="M4 8l1.5-4h13L20 8" />
-        <path d="M4 8h16v11H4z" />
-        <path d="M9 12a3 3 0 0 0 6 0" />
-      </svg>
-    ),
-  },
-];
+const HERO_CARDS = [
+  { src: "/nft/axiszero.png", alt: "AxisZero", rot: "-14deg", delay: "0.1s", width: 96, height: 127 },
+  { src: "/nft/axisone.png", alt: "AxisOne", rot: "-6deg", delay: "0.2s", width: 96, height: 141 },
+  { src: "/nft/axisprestige.png", alt: "AxisPrestige", rot: "4deg", delay: "0.3s", width: 110, height: 155 },
+  { src: "/nft/axispro.png", alt: "AxisPro", rot: "13deg", delay: "0.4s", width: 96, height: 134 },
+] as const;
 
 export default async function RootPage() {
   const user = await verifySession();
@@ -79,17 +39,30 @@ export default async function RootPage() {
           Track cases, earn $AXIS, and manage your founding node — all from one app.
         </p>
 
-        <div className="mt-10 grid w-full grid-cols-2 gap-2.5">
-          {FEATURES.map((f) => (
-            <div key={f.label} className="card !mb-0 flex flex-col items-center gap-2 py-5 text-center">
-              <div className="text-gold-light">{f.icon}</div>
-              <div>
-                <p className="text-[12.5px] font-[800]">{f.label}</p>
-                <p className="mt-0.5 text-[10.5px] leading-[1.4] text-dim2">{f.desc}</p>
-              </div>
+        <div className="relative z-[2] mt-10 flex h-[160px] items-end justify-center">
+          {HERO_CARDS.map((card, i) => (
+            <div
+              key={card.alt}
+              className={`relative overflow-hidden rounded-[10px] border border-gold-border opacity-0 shadow-[0_12px_30px_rgba(0,0,0,0.5)] [animation:card-rise_1s_cubic-bezier(0.16,1,0.3,1)_forwards] ${
+                i < HERO_CARDS.length - 1 ? "mr-[-20px]" : ""
+              }`}
+              style={
+                {
+                  "--rot": card.rot,
+                  animationDelay: card.delay,
+                  width: card.width,
+                  aspectRatio: `${card.width}/${card.height}`,
+                  zIndex: i === 2 ? 3 : i === 1 || i === 3 ? 2 : 1,
+                } as React.CSSProperties
+              }
+            >
+              <Image src={card.src} alt={card.alt} fill className="object-cover" sizes="110px" />
             </div>
           ))}
         </div>
+        <p className="mt-5 text-[11px] font-semibold tracking-[0.04em] text-dim2 uppercase">
+          AxisZero to AxisPrestige — pick your founding tier
+        </p>
       </div>
 
       <div className="px-6 pt-2 pb-9">

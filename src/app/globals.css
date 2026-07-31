@@ -20,6 +20,10 @@
   --amber: #F0C674;
 }
 
+@keyframes card-rise {
+  to { opacity: 1; transform: translateY(0) rotate(var(--rot, 0deg)); }
+}
+
 @theme inline {
   --color-gold: var(--gold);
   --color-gold-light: var(--gold-light);
