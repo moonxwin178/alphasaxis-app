@@ -7,7 +7,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
   await requireRole("USER");
   return (
     <AppShell>
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 pb-6">{children}</div>
       <BottomNav tabs={USER_TABS} />
     </AppShell>
   );

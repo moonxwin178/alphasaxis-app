@@ -7,7 +7,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireRole("ADMIN");
   return (
     <AppShell>
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 pb-6">{children}</div>
       <BottomNav tabs={ADMIN_TABS} />
     </AppShell>
   );

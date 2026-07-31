@@ -7,7 +7,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   await requireRole("AGENT");
   return (
     <AppShell>
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 pb-6">{children}</div>
       <BottomNav tabs={AGENT_TABS} />
     </AppShell>
   );
