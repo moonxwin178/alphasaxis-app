@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
@@ -32,8 +33,26 @@ export default async function EarnPage() {
       <AppHeader title="Rewards and Points" />
       <div className="px-4 pt-4">
         <div className="card p-5 text-center">
-          <p className="eyebrow">$AXIS points balance</p>
+          <p className="eyebrow flex items-center justify-center gap-1.5">
+            <Image src="/nft/token.png" alt="$AXIS" width={13} height={13} className="rounded-full" />
+            $AXIS points balance
+          </p>
           <p className="my-1 text-[28px] font-extrabold text-white">{balance.toLocaleString()}</p>
+        </div>
+
+        <div className="card !mb-3.5 flex items-center gap-3 border-[var(--gold-light)] bg-[linear-gradient(135deg,rgba(255,218,164,0.1),rgba(158,124,69,0.04))]">
+          <div className="card-icon !m-0 bg-[linear-gradient(135deg,var(--gold-light),var(--gold))] text-[#241505]">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              <path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="row-title">Quick win: daily check-in</p>
+            <p className="row-sub">+5 pts, once a day, takes 2 seconds</p>
+          </div>
+          <Link href="/earn/social" className="badge gold shrink-0">
+            Check in
+          </Link>
         </div>
 
         <div className="grid2 my-3.5">
@@ -45,6 +64,7 @@ export default async function EarnPage() {
               </svg>
             </div>
             <p className="row-title mt-0.5">Spend to Earn</p>
+            <p className="row-sub">Upload a receipt</p>
           </Link>
           <Link href="/earn/submit" className="card cursor-pointer text-center">
             <div className="card-icon">
@@ -54,6 +74,7 @@ export default async function EarnPage() {
               </svg>
             </div>
             <p className="row-title mt-0.5">Submit to Earn</p>
+            <p className="row-sub">+20 to +100 pts</p>
           </Link>
           <Link href="/earn/network" className="card cursor-pointer text-center">
             <div className="card-icon">
@@ -64,6 +85,7 @@ export default async function EarnPage() {
               </svg>
             </div>
             <p className="row-title mt-0.5">Network to Earn</p>
+            <p className="row-sub">Refer & earn per case</p>
           </Link>
           <Link href="/earn/social" className="card cursor-pointer text-center">
             <div className="card-icon">
@@ -72,6 +94,7 @@ export default async function EarnPage() {
               </svg>
             </div>
             <p className="row-title mt-0.5">Social to Earn</p>
+            <p className="row-sub">+5 pts daily check-in</p>
           </Link>
         </div>
 

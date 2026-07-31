@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { loginUser } from "@/app/actions/auth";
+import { SocialAuthButtons } from "@/components/SocialAuthButtons";
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(loginUser, undefined);
@@ -30,6 +31,9 @@ export default function LoginPage() {
           Create an account
         </Link>
       </p>
+      <div className="mt-5">
+        <SocialAuthButtons />
+      </div>
     </form>
   );
 }

@@ -6,7 +6,7 @@ import { jwtVerify } from "jose";
 // Real authorization happens server-side via requireUser()/requireRole()
 // in src/lib/dal.ts on every protected page/action.
 
-const PUBLIC_PREFIXES = ["/login", "/register", "/calculator"];
+const PUBLIC_PREFIXES = ["/", "/login", "/register", "/calculator"];
 const AGENT_PREFIX = "/agent";
 const AGENCY_PREFIX = "/agency";
 const ADMIN_PREFIX = "/admin";

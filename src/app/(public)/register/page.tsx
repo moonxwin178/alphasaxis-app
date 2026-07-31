@@ -4,6 +4,7 @@ import { Suspense, useActionState } from "react";
 import Link from "next/link";
 import { registerUser } from "@/app/actions/auth";
 import { ReferralHiddenField } from "@/components/ReferralHiddenField";
+import { SocialAuthButtons } from "@/components/SocialAuthButtons";
 
 export default function RegisterPage() {
   const [state, action, pending] = useActionState(registerUser, undefined);
@@ -46,6 +47,9 @@ export default function RegisterPage() {
           Log in
         </Link>
       </p>
+      <div className="mt-5">
+        <SocialAuthButtons />
+      </div>
     </form>
   );
 }
