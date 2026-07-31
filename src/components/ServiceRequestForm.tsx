@@ -51,8 +51,9 @@ export function ServiceRequestForm({
         </p>
       ) : (
         <p className="p-note">
-          Payment in {method === "RM" ? "Ringgit" : "USDT"} isn&apos;t automated yet — submit your
-          request and our team will follow up directly to collect payment.
+          Payment in {method === "RM" ? "Ringgit" : "USDT"}{" "}
+          isn&apos;t automated yet — submit your request and our team will follow up directly to
+          collect payment.
         </p>
       )}
 

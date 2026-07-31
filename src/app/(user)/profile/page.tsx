@@ -8,6 +8,7 @@ import { RoleApplicationForm } from "@/components/RoleApplicationForm";
 import { TierRing } from "@/components/TierRing";
 import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
 import { getWalletBalance } from "@/lib/wallet";
+import { PhoneEditRow } from "@/components/PhoneEditRow";
 
 const KYC_BADGE: Record<string, string> = {
   NOT_SUBMITTED: '<span class="badge amber">Not submitted</span>',
@@ -75,6 +76,7 @@ export default async function ProfilePage() {
               dangerouslySetInnerHTML={{ __html: KYC_BADGE[kyc?.status ?? "NOT_SUBMITTED"] }}
             />
           </div>
+          <PhoneEditRow phone={self.phone} />
         </div>
 
         <div>
@@ -121,6 +123,46 @@ export default async function ProfilePage() {
           ) : (
             <RoleApplicationForm walletBalance={walletBalance} />
           )}
+        </div>
+
+        <div>
+          <p className="eyebrow">About</p>
+          <a href="https://alphasaxis.com/terms" target="_blank" rel="noopener noreferrer" className="row">
+            <div className="min-w-0 flex-1">
+              <p className="row-title">Terms of Service</p>
+            </div>
+            <div className="chev">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </div>
+          </a>
+          <a href="https://alphasaxis.com/privacy" target="_blank" rel="noopener noreferrer" className="row">
+            <div className="min-w-0 flex-1">
+              <p className="row-title">Privacy Policy</p>
+            </div>
+            <div className="chev">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </div>
+          </a>
+          <a href="https://alphasaxis.com/risk-disclosure" target="_blank" rel="noopener noreferrer" className="row">
+            <div className="min-w-0 flex-1">
+              <p className="row-title">Risk Disclosure</p>
+            </div>
+            <div className="chev">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </div>
+          </a>
+          <div className="row" style={{ cursor: "default" }}>
+            <div className="min-w-0 flex-1">
+              <p className="row-title">App version</p>
+            </div>
+            <div className="row-right">1.0.0</div>
+          </div>
         </div>
 
         <LogoutButton />
