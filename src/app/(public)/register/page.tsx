@@ -41,13 +41,13 @@ export default function RegisterPage() {
       <button className="btn primary" type="submit" disabled={pending}>
         {pending ? "Creating account…" : "Create Account"}
       </button>
-      <p className="p-note mt-3 text-center">
+      <p className="p-note mt-3.5 text-center">
         Already have an account?{" "}
         <Link href="/login" className="font-semibold text-gold-light">
           Log in
         </Link>
       </p>
-      <div className="mt-5">
+      <div className="mt-7">
         <SocialAuthButtons />
       </div>
     </form>

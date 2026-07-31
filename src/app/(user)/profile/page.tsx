@@ -49,7 +49,7 @@ export default async function ProfilePage() {
 
         <ReferralCodeBox code={self.referralCode} />
 
-        <p className="eyebrow mt-3.5">Settings</p>
+        <p className="eyebrow mt-6">Settings</p>
         <div className="row">
           <div className="row-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
@@ -65,7 +65,7 @@ export default async function ProfilePage() {
           />
         </div>
 
-        <p className="eyebrow mt-3.5">My NFT</p>
+        <p className="eyebrow mt-6">My NFT</p>
         <div className="card">
           <div className="flex items-center gap-3">
             <TierRing tier={nftHolding?.tier ?? null} />
@@ -81,7 +81,7 @@ export default async function ProfilePage() {
           </Link>
         </div>
 
-        <p className="eyebrow mt-3.5">Grow with AlphasAxis</p>
+        <p className="eyebrow mt-6">Grow with AlphasAxis</p>
         {pendingApplication ? (
           <div className="card">
             <p className="row-title mb-1">Application submitted</p>

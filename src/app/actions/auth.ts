@@ -3,26 +3,14 @@
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { customAlphabet } from "nanoid";
 import { getPrisma } from "@/lib/prisma";
 import { createSession, deleteSession } from "@/lib/session";
 import { EMAIL_PATTERN, getClientIpFromHeaders, isRateLimited, stripControlChars } from "@/lib/apiSecurity";
+import { generateUniqueReferralCode } from "@/lib/referral";
 
 export type AuthFormState = { error?: string } | undefined;
 
 const NAME_MAX = 100;
-const referralCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1
-const generateReferralCode = customAlphabet(referralCodeAlphabet, 8);
-
-async function generateUniqueReferralCode(): Promise<string> {
-  const prisma = getPrisma();
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const code = generateReferralCode();
-    const existing = await prisma.user.findUnique({ where: { referralCode: code } });
-    if (!existing) return code;
-  }
-  throw new Error("Could not generate a unique referral code.");
-}
 
 /**
  * Phase A only activates USER-role accounts. Agent/Agency self-registration

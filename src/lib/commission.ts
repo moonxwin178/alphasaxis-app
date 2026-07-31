@@ -11,7 +11,7 @@ const RATE_BY_FINANCING_TYPE: Record<FinancingType, number> = {
 };
 
 export const TIER_MULTIPLIER: Record<NftTier, number> = {
-  AXIS_ZERO: 1,
+  AXIS_ZERO: 0.5,
   AXIS_ONE: 1.5,
   AXIS_PRO: 2,
   AXIS_PRESTIGE: 3,

@@ -52,11 +52,16 @@ body {
 }
 
 /* ---- Shared app-shell components (ported from the SuperApp prototype) ---- */
+/* Layered as "components" (below Tailwind's "utilities" layer) so that
+   Tailwind spacing/sizing utility classes (mt-*, mb-*, etc.) reliably win
+   over these defaults regardless of source order — without this, e.g.
+   "eyebrow mt-6" silently loses to .eyebrow's own margin. */
+@layer components {
 
 .card { background: var(--card); border: 1px solid var(--gold-border); border-radius: 14px; padding: 14px 15px; margin-bottom: 11px; }
 .gold-text { background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .gold-line { height: 2px; width: 56px; background: linear-gradient(90deg, var(--gold), var(--gold-light)); border-radius: 2px; margin: 0 0 12px; }
-.eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--gold); font-weight: 700; margin: 0 0 5px; }
+.eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--gold); font-weight: 700; margin-bottom: 9px; }
 .p-note { font-size: 12.5px; color: var(--dim); line-height: 1.65; margin: 0 0 12px; font-weight: 400; }
 
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 13px; }
@@ -142,3 +147,5 @@ body {
 .bottomnav a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--dim2); font-size: 9.5px; font-weight: 700; text-decoration: none; }
 .bottomnav a.active { color: var(--gold-light); }
 .bottomnav svg { width: 19px; height: 19px; }
+
+}

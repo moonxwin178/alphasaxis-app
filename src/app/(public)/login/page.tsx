@@ -1,16 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
 import Link from "next/link";
 import { loginUser } from "@/app/actions/auth";
 import { SocialAuthButtons } from "@/components/SocialAuthButtons";
+import { OAuthErrorBanner } from "@/components/OAuthErrorBanner";
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(loginUser, undefined);
 
   return (
     <form action={action}>
-      <h1 className="h2 mb-4">Log in</h1>
+      <h1 className="h2 mb-5">Log in</h1>
+      <Suspense fallback={null}>
+        <OAuthErrorBanner />
+      </Suspense>
       <div className="field">
         <label htmlFor="email">Email</label>
         <input id="email" name="email" type="email" required autoComplete="email" />
@@ -25,13 +29,13 @@ export default function LoginPage() {
       <button className="btn primary" type="submit" disabled={pending}>
         {pending ? "Logging in…" : "Log In"}
       </button>
-      <p className="p-note mt-3 text-center">
+      <p className="p-note mt-3.5 text-center">
         New here?{" "}
         <Link href="/register" className="font-semibold text-gold-light">
           Create an account
         </Link>
       </p>
-      <div className="mt-5">
+      <div className="mt-7">
         <SocialAuthButtons />
       </div>
     </form>

@@ -69,7 +69,7 @@ export default async function AgentCaseDetailPage({ params }: { params: Promise<
 
         {nextLabel && <AdvanceStageButton caseId={theCase.id} label={nextLabel} />}
 
-        <p className="eyebrow mt-3.5">Documents</p>
+        <p className="eyebrow mt-6">Documents</p>
         <div className="card">
           {theCase.documents.length === 0 ? (
             <p className="p-note">No documents yet.</p>
@@ -92,7 +92,7 @@ export default async function AgentCaseDetailPage({ params }: { params: Promise<
         </div>
         <CaseDocUploadForm caseId={theCase.id} />
 
-        <p className="eyebrow mt-3.5">Timeline</p>
+        <p className="eyebrow mt-6">Timeline</p>
         <div className="card">
           {theCase.events.map((ev) => (
             <div key={ev.id} className="row">

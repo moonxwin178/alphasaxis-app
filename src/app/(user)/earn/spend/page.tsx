@@ -27,7 +27,7 @@ export default async function EarnSpendPage() {
         </p>
         <SpendProofForm />
 
-        <p className="eyebrow mt-3.5">Past submissions</p>
+        <p className="eyebrow mt-6">Past submissions</p>
         {submissions.length === 0 && <p className="p-note">No submissions yet.</p>}
         {submissions.map((s) => (
           <div key={s.id} className="row">

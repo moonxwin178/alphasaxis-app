@@ -7,7 +7,7 @@ import { mintNftTier } from "@/app/actions/nft";
 import { TIER_IMAGE } from "@/lib/commission";
 
 const TIERS = [
-  { key: "AXIS_ZERO", name: "AxisZero", sub: "Entry level", desc: "Platform access, basic earning", mult: "1x" },
+  { key: "AXIS_ZERO", name: "AxisZero", sub: "Entry level", desc: "Platform access, basic earning", mult: "0.5x" },
   { key: "AXIS_ONE", name: "AxisOne", sub: "Active consultant", desc: "Full CRM access, mining rewards", mult: "1.5x" },
   { key: "AXIS_PRO", name: "AxisPro", sub: "High-performing agent", desc: "Performance multipliers, elevated share", mult: "2x" },
   { key: "AXIS_PRESTIGE", name: "AxisPrestige", sub: "Founding participant", desc: "Lifetime ecosystem rewards, node rights", mult: "3x" },
