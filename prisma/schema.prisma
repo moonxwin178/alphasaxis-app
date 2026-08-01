@@ -126,6 +126,7 @@ enum WalletReason {
   AGENCY_MEMBERSHIP
   AGENCY_MEMBERSHIP_REFUND
   ADMIN_ADJUST
+  AXISPRESTIGE_REVENUE_SHARE
 }
 
 enum AgencyAgentStatus {
@@ -203,6 +204,9 @@ model User {
   reviewedMiningSubmissions AxisMiningSubmission[]         @relation("MiningSubmissionReviewer")
   axisVestingLedger         AxisVestingLedgerEntry[]
   axisPrestigeLines         AxisPrestigeDistributionLine[]
+  axisPrestigeVestingLines  AxisPrestigeVestingRunLine[]
+  axisPrestigeNodeVestings  AxisPrestigeNodeVesting[]
+  axisRealizedValueEntries  AxisRealizedValueEntry[]
 
   @@index([role])
 }
@@ -260,6 +264,13 @@ model KycSubmission {
   userId         String        @unique
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   status         KycStatus     @default(NOT_SUBMITTED)
+  // ISO country name as entered at KYC time (e.g. "Malaysia"). Drives
+  // region-gating for Agent2Mine Spend-to-Earn/Submit-to-Earn tasks — see
+  // ALLOWED_MINING_COUNTRIES in src/lib/regionGate.ts. Malaysia-only at
+  // launch, deliberately extensible as AlphasAxis opens up more of SEA.
+  // Network-to-Earn/Social-to-Earn stay unrestricted since $AXIS itself is
+  // on-chain and not country-bound.
+  nationality    String?
   reviewedById   String?
   reviewer       User?         @relation("KycReviewer", fields: [reviewedById], references: [id])
   reviewedAt     DateTime?
@@ -617,8 +628,14 @@ enum MetaAdsCategory {
 
 enum AxisLedgerSource {
   AGENT2MINE_TASK
-  AXISPRESTIGE_QUARTERLY
+  AXISPRESTIGE_VESTING
   ADMIN_ADJUST
+}
+
+enum AxisRealizedValueSource {
+  REVENUE_DISTRIBUTION
+  TOKEN_SALE
+  MARKETPLACE_REDEMPTION
 }
 
 // One row per Spend-to-Earn submission. Duplicate-receipt fraud detection
@@ -688,17 +705,41 @@ model AxisMiningPoolConfig {
   createdAt       DateTime @default(now())
 }
 
-// AxisPrestige quarterly distribution — a distinct mechanism from Agent2Mine
-// task-based mining. Draws from the "Early Backers" allocation (18% of 178B
-// = 32.04B tokens) and pays out to AxisPrestige node holders each quarter,
-// not per-task.
+enum AxisPrestigePoolEntrySource {
+  CASE_CONTRIBUTION
+  ADMIN_ADJUST
+  DISTRIBUTION_PAYOUT
+}
+
+// Running USD pool that funds AxisPrestige's quarterly revenue share.
+// Positive delta = an admin logging real revenue from an actual converted
+// case into the pool (per the confirmed rule — this is a real dollar
+// figure tied to a real disbursed case, not an arbitrary number). Negative
+// delta = drawn down when a quarterly distribution runs. Balance =
+// SUM(delta), same append-only ledger pattern as everything else here.
+model AxisPrestigeRevenuePoolEntry {
+  id          String                      @id @default(cuid())
+  amountUsd   Decimal                     @db.Decimal(14, 2)
+  source      AxisPrestigePoolEntrySource
+  caseId      String?
+  note        String?
+  createdById String?
+  createdAt   DateTime                    @default(now())
+}
+
+// Quarterly REVENUE-SHARE distribution — paid in USD/USDT terms to the
+// in-app wallet (WalletLedgerEntry), not in $AXIS. Distinct from the $AXIS
+// token vesting below: this draws down the pool above and splits evenly
+// across verified node holders, admin-triggered each quarter. Each line's
+// amount also lands in AxisRealizedValueEntry (source REVENUE_DISTRIBUTION)
+// since it counts toward the 25x realized-value burn cap on that node's
+// token vesting — see src/lib/axisPrestigeVesting.ts.
 model AxisPrestigeDistribution {
-  id                     String                         @id @default(cuid())
-  quarterLabel           String
-  totalDistributedTokens Decimal                        @db.Decimal(20, 4)
-  perNodeAmount          Decimal                        @db.Decimal(18, 4)
-  createdById            String?
-  createdAt              DateTime                       @default(now())
+  id                  String                         @id @default(cuid())
+  label               String
+  totalDistributedUsd Decimal                        @db.Decimal(14, 2)
+  createdById         String?
+  createdAt           DateTime                       @default(now())
 
   lines AxisPrestigeDistributionLine[]
 }
@@ -710,8 +751,81 @@ model AxisPrestigeDistributionLine {
   userId         String
   user           User                     @relation(fields: [userId], references: [id])
   nftHoldingId   String
-  amount         Decimal                  @db.Decimal(18, 4)
+  amountUsd      Decimal                  @db.Decimal(14, 2)
 
   @@index([distributionId])
+  @@index([userId])
+}
+
+// One batch-audit record per $AXIS token vesting run, admin-triggered (not
+// a real cron). totalCreditedTokens is a snapshot sum of that run's lines —
+// see src/lib/axisPrestigeVesting.ts for how each node's newly-vested delta
+// is computed and credited to AxisVestingLedgerEntry.
+model AxisPrestigeVestingRun {
+  id                   String                     @id @default(cuid())
+  label                String
+  totalCreditedTokens  Decimal                    @db.Decimal(20, 4)
+  createdById          String?
+  createdAt            DateTime                   @default(now())
+
+  lines AxisPrestigeVestingRunLine[]
+}
+
+model AxisPrestigeVestingRunLine {
+  id           String                 @id @default(cuid())
+  runId        String
+  run          AxisPrestigeVestingRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                   @relation(fields: [userId], references: [id])
+  nftHoldingId String
+  amount       Decimal                @db.Decimal(18, 4)
+
+  @@index([runId])
+  @@index([userId])
+}
+
+// Per-node vesting state. Created the moment an admin verifies a node claim
+// (see reviewNodeVerification in actions/admin.ts). Confirmed real numbers:
+// $500/node at the $0.0001 AxisPrestige anchor price = 5,000,000 $AXIS
+// total allocation per node. 6-month cliff from verification, then linear
+// daily vesting over 5 years — performanceMultiplier (from Agent2Mine task
+// performance) speeds this up. cumulativeVested tracks what's already been
+// credited to AxisVestingLedgerEntry so re-running the vesting batch only
+// credits the newly-vested delta, never double-pays.
+model AxisPrestigeNodeVesting {
+  id                    String    @id @default(cuid())
+  nftHoldingId          String    @unique
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  allocationTokens      Decimal   @db.Decimal(18, 4)
+  verifiedAt            DateTime
+  cliffMonths           Int       @default(6)
+  vestingMonths         Int       @default(60)
+  performanceMultiplier Float     @default(1.0)
+  cumulativeVested      Decimal   @default(0) @db.Decimal(18, 4)
+  burned                Boolean   @default(false)
+  burnedAt              DateTime?
+  createdAt             DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Manually admin-recorded realized-value events — profit a node holder has
+// already taken (revenue-distribution payouts, $AXIS sold for USDT,
+// $AXIS spent on marketplace vouchers/services/RWA). No real custody/
+// exchange integration exists yet, so this is entered by an admin, same
+// "pending manual review" pattern as the rest of the app. Once a user's
+// cumulative realized value hits 25x their $500 node cost ($12,500), their
+// node's remaining unvested allocation is burned — see
+// src/lib/axisPrestigeVesting.ts.
+model AxisRealizedValueEntry {
+  id        String                  @id @default(cuid())
+  userId    String
+  user      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountUsd Decimal                 @db.Decimal(14, 2)
+  source    AxisRealizedValueSource
+  note      String?
+  createdAt DateTime                @default(now())
+
   @@index([userId])
 }

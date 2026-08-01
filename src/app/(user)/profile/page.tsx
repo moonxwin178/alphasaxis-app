@@ -9,7 +9,7 @@ import { TierRing } from "@/components/TierRing";
 import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
 import { getWalletBalance } from "@/lib/wallet";
 import { PhoneEditRow } from "@/components/PhoneEditRow";
-import { getAxisVestingBalance } from "@/lib/axisEmission";
+import { computeVestedTokens } from "@/lib/axisPrestigeVesting";
 
 const KYC_BADGE: Record<string, string> = {
   NOT_SUBMITTED: '<span class="badge amber">Not submitted</span>',
@@ -37,8 +37,23 @@ export default async function ProfilePage() {
   ]);
   const currentTier = nftHolding?.tier ?? "AXIS_ZERO";
   const hasPrestige = nftHolding?.tier === "AXIS_PRESTIGE";
-  const prestigeEarnings = hasPrestige
-    ? await getAxisVestingBalance(user.id, "AXISPRESTIGE_QUARTERLY")
+
+  const nodeVesting = hasPrestige
+    ? await prisma.axisPrestigeNodeVesting.findFirst({ where: { userId: user.id } })
+    : null;
+  const vestedTokens = nodeVesting
+    ? computeVestedTokens({
+        allocationTokens: Number(nodeVesting.allocationTokens),
+        verifiedAt: nodeVesting.verifiedAt,
+        cliffMonths: nodeVesting.cliffMonths,
+        vestingMonths: nodeVesting.vestingMonths,
+        performanceMultiplier: nodeVesting.performanceMultiplier,
+      })
+    : 0;
+  const revenueShareEarned = hasPrestige
+    ? await prisma.walletLedgerEntry
+        .aggregate({ where: { userId: user.id, reason: "AXISPRESTIGE_REVENUE_SHARE" }, _sum: { delta: true } })
+        .then((r) => Number(r._sum.delta ?? 0))
     : 0;
 
   const initials = self.name
@@ -111,10 +126,20 @@ export default async function ProfilePage() {
                 Verify an AxisPrestige Node
               </Link>
             )}
-            {hasPrestige && (
-              <p className="p-note mt-2.5 !mb-0 text-[var(--green)]">
-                {prestigeEarnings.toLocaleString()} $AXIS earned from quarterly node distributions.
-              </p>
+            {hasPrestige && nodeVesting && (
+              <div className="mt-2.5">
+                <p className="p-note !mb-1 text-[var(--green)]">
+                  {vestedTokens.toLocaleString(undefined, { maximumFractionDigits: 2 })} /{" "}
+                  {Number(nodeVesting.allocationTokens).toLocaleString()} $AXIS vested
+                  {nodeVesting.burned ? " — remaining allocation burned (25x cap reached)" : ""}
+                </p>
+                <p className="p-note !mb-0 text-[var(--green)]">
+                  ${revenueShareEarned.toLocaleString()} earned from quarterly revenue share
+                </p>
+              </div>
+            )}
+            {hasPrestige && !nodeVesting && (
+              <p className="p-note mt-2.5 !mb-0">Your node is verified — vesting starts once an admin runs the next batch.</p>
             )}
           </div>
         </div>

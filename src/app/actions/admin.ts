@@ -12,7 +12,9 @@ import { generateUniqueReferralCode } from "@/lib/referral";
 import { createConsultantInviteToken } from "@/lib/inviteToken";
 import { EMAIL_PATTERN, stripControlChars } from "@/lib/apiSecurity";
 import { getEmissionSnapshot, type MiningTier } from "@/lib/axisEmission";
-import { createAxisPrestigeDistribution } from "@/lib/axisPrestigeDistribution";
+import { createNodeVesting, runVestingBatch } from "@/lib/axisPrestigeVesting";
+import { contributeToPrestigePool, runRevenueDistribution } from "@/lib/axisPrestigeRevenue";
+import type { AxisRealizedValueSource } from "@/generated/prisma/client";
 
 export type AdminFormState = { error?: string } | undefined;
 
@@ -331,20 +333,121 @@ export async function reviewMiningSubmission(
  * pool to release each time are business decisions, not something to
  * automate without the user's sign-off (flagged in the delivery summary).
  */
-export async function runAxisPrestigeDistribution(
-  quarterLabel: string,
-  totalDistributedTokens: number
+/**
+ * Approves (or rejects) a PENDING AxisPrestige node-wallet claim submitted
+ * via submitNodeVerification (actions/nft.ts). Approval is what starts the
+ * clock — it creates the node's vesting record (cliff begins now).
+ */
+export async function reviewNodeVerification(nftHoldingId: string, approve: boolean): Promise<AdminFormState> {
+  await requireRole("ADMIN");
+  const prisma = getPrisma();
+
+  const holding = await prisma.nftHolding.findUnique({ where: { id: nftHoldingId } });
+  if (!holding || holding.tier !== "AXIS_PRESTIGE") return { error: "Node claim not found." };
+  if (holding.verificationStatus !== "PENDING") return { error: "This claim has already been reviewed." };
+
+  if (!approve) {
+    await prisma.nftHolding.update({ where: { id: nftHoldingId }, data: { verificationStatus: "REJECTED" } });
+    revalidatePath("/admin/axisprestige");
+    return undefined;
+  }
+
+  const verifiedAt = new Date();
+  await prisma.nftHolding.update({
+    where: { id: nftHoldingId },
+    data: { verificationStatus: "VERIFIED", chain: "verified-manual" },
+  });
+  await createNodeVesting(nftHoldingId, holding.userId, verifiedAt);
+
+  revalidatePath("/admin/axisprestige");
+  revalidatePath("/profile");
+  return undefined;
+}
+
+/** Logs real revenue from an actual converted case (or a manual top-up) into the AxisPrestige revenue pool — the funding source for quarterly distributions. */
+export async function contributeAxisPrestigeRevenue(
+  amountUsd: number,
+  caseId: string | null,
+  note: string
+): Promise<AdminFormState> {
+  const admin = await requireRole("ADMIN");
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return { error: "Enter a valid contribution amount." };
+
+  await contributeToPrestigePool(amountUsd, caseId || null, stripControlChars(note).slice(0, 200) || null, admin.id);
+  revalidatePath("/admin/axisprestige");
+  return undefined;
+}
+
+/** Distributes amountUsd from the accumulated pool evenly across verified nodes, paid to their in-app wallet. */
+export async function runAxisPrestigeRevenueDistribution(
+  label: string,
+  amountUsd: number
 ): Promise<AdminFormState> {
   const admin = await requireRole("ADMIN");
 
-  const cleanLabel = stripControlChars(quarterLabel).slice(0, 20);
+  const cleanLabel = stripControlChars(label).slice(0, 20);
   if (!cleanLabel) return { error: "Enter a quarter label (e.g. Q1 2027)." };
-  if (!Number.isFinite(totalDistributedTokens) || totalDistributedTokens <= 0) {
-    return { error: "Enter a valid token amount to distribute." };
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return { error: "Enter a valid amount to distribute." };
+
+  const result = await runRevenueDistribution(cleanLabel, amountUsd, admin.id);
+  if ("error" in result) return { error: result.error };
+
+  revalidatePath("/admin/axisprestige");
+  return undefined;
+}
+
+/** Processes $AXIS token vesting for every active node — credits whatever has newly vested since the last run, checking the 25x burn cap first. */
+export async function runAxisPrestigeVestingBatch(): Promise<AdminFormState> {
+  await requireRole("ADMIN");
+  const prisma = getPrisma();
+
+  const lines = await runVestingBatch();
+  if (lines.length > 0) {
+    const total = lines.reduce((sum, l) => sum + l.amount, 0);
+    await prisma.axisPrestigeVestingRun.create({
+      data: {
+        label: new Date().toLocaleDateString(),
+        totalCreditedTokens: total,
+        lines: { create: lines.map((l) => ({ userId: l.userId, nftHoldingId: l.nftHoldingId, amount: l.amount })) },
+      },
+    });
   }
 
-  const result = await createAxisPrestigeDistribution(cleanLabel, totalDistributedTokens, admin.id);
-  if ("error" in result) return { error: result.error };
+  revalidatePath("/admin/axisprestige");
+  revalidatePath("/earn/mine");
+  revalidatePath("/profile");
+  return undefined;
+}
+
+/** Admin-editable "hash rate power" multiplier — ties Agent2Mine task performance to faster token vesting. Manual for now; see the flag on the exact auto-scoring formula. */
+export async function setNodePerformanceMultiplier(nodeVestingId: string, multiplier: number): Promise<AdminFormState> {
+  await requireRole("ADMIN");
+  if (!Number.isFinite(multiplier) || multiplier <= 0) return { error: "Enter a valid multiplier." };
+
+  const prisma = getPrisma();
+  await prisma.axisPrestigeNodeVesting.update({
+    where: { id: nodeVestingId },
+    data: { performanceMultiplier: multiplier },
+  });
+
+  revalidatePath("/admin/axisprestige");
+  return undefined;
+}
+
+/** Manually logs a realized-value event (token sale or marketplace redemption) — no real exchange/marketplace $AXIS integration exists yet, so an admin records it when they see evidence of it. Feeds the 25x burn cap alongside auto-logged revenue-share payouts. */
+export async function recordRealizedValue(
+  userId: string,
+  amountUsd: number,
+  source: Extract<AxisRealizedValueSource, "TOKEN_SALE" | "MARKETPLACE_REDEMPTION">,
+  note: string
+): Promise<AdminFormState> {
+  await requireRole("ADMIN");
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return { error: "Enter a valid amount." };
+
+  const prisma = getPrisma();
+  await prisma.axisRealizedValueEntry.create({
+    data: { userId, amountUsd, source, note: stripControlChars(note).slice(0, 200) || null },
+  });
 
   revalidatePath("/admin/axisprestige");
   return undefined;
