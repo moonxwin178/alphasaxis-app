@@ -6,6 +6,7 @@ import { AdminKycRow } from "@/components/AdminKycRow";
 import { AdminRoleAppRow } from "@/components/AdminRoleAppRow";
 import { AdminTopUpRow } from "@/components/AdminTopUpRow";
 import { InviteConsultantForm } from "@/components/InviteConsultantForm";
+import { LogoutButton } from "@/components/LogoutButton";
 
 const STATUS_BADGE: Record<string, string> = {
   VERIFIED: '<span class="badge green">Approved</span>',
@@ -123,6 +124,10 @@ export default async function AdminUsersPage() {
             </div>
           )
         )}
+
+        <div className="mt-4">
+          <LogoutButton />
+        </div>
       </div>
     </div>
   );
