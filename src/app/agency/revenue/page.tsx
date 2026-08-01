@@ -6,7 +6,10 @@ export default async function AgencyRevenuePage() {
   const owner = await requireRole("AGENCY");
   const prisma = getPrisma();
 
-  const agency = await prisma.agency.findUnique({ where: { ownerId: owner.id } });
+  const agency = await prisma.agency.findUnique({
+    where: { ownerId: owner.id },
+    include: { agencyAgent: { where: { status: "ACTIVE" }, select: { userId: true } } },
+  });
   if (!agency) {
     return (
       <div>
@@ -18,11 +21,16 @@ export default async function AgencyRevenuePage() {
     );
   }
 
-  const commissions = await prisma.commission.findMany({ where: { agencyId: agency.id } });
-  const total = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
-  const pending = commissions.filter((c) => c.status === "PENDING").reduce((s, c) => s + Number(c.amount), 0);
-  const approved = commissions.filter((c) => c.status === "APPROVED").reduce((s, c) => s + Number(c.amount), 0);
-  const paid = commissions.filter((c) => c.status === "PAID").reduce((s, c) => s + Number(c.amount), 0);
+  // Revenue across the whole roster: the owner's own commission lines
+  // (including OVERRIDE_UPLINE — the 3% they earn from their team's deals)
+  // plus every active team member's own lines.
+  const rosterIds = [owner.id, ...agency.agencyAgent.map((a) => a.userId)];
+  const lines = await prisma.commissionLineItem.findMany({ where: { recipientId: { in: rosterIds } } });
+
+  const total = lines.reduce((sum, c) => sum + Number(c.amount), 0);
+  const pending = lines.filter((c) => c.status === "PENDING").reduce((s, c) => s + Number(c.amount), 0);
+  const approved = lines.filter((c) => c.status === "APPROVED").reduce((s, c) => s + Number(c.amount), 0);
+  const paid = lines.filter((c) => c.status === "PAID").reduce((s, c) => s + Number(c.amount), 0);
 
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
@@ -58,8 +66,7 @@ export default async function AgencyRevenuePage() {
         </div>
 
         <p className="p-note mt-2.5">
-          {commissions.length} commission {commissions.length === 1 ? "record" : "records"} across your
-          roster.
+          {lines.length} commission {lines.length === 1 ? "line" : "lines"} across your roster.
         </p>
       </div>
     </div>

@@ -8,6 +8,7 @@ import { createSession, deleteSession } from "@/lib/session";
 import { EMAIL_PATTERN, getClientIpFromHeaders, isRateLimited, stripControlChars } from "@/lib/apiSecurity";
 import { generateUniqueReferralCode } from "@/lib/referral";
 import { getGrandMasterId } from "@/lib/grandMaster";
+import { verifyConsultantInviteToken } from "@/lib/inviteToken";
 
 export type AuthFormState = { error?: string } | undefined;
 
@@ -102,6 +103,7 @@ export async function loginUser(_prevState: AuthFormState, formData: FormData): 
     USER: "/cases",
     AGENT: "/agent/pipeline",
     AGENCY: "/agency/agents",
+    LOAN_CONSULTANT: "/consultant/pipeline",
     ADMIN: "/admin/users",
   };
   redirect(homeByRole[user.role] ?? "/cases");
@@ -110,4 +112,24 @@ export async function loginUser(_prevState: AuthFormState, formData: FormData): 
 export async function logoutUser(_formData: FormData): Promise<void> {
   await deleteSession();
   redirect("/login");
+}
+
+export async function acceptConsultantInvite(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
+
+  const decoded = await verifyConsultantInviteToken(token);
+  if (!decoded) return { error: "This invite link is invalid or has expired." };
+
+  const prisma = getPrisma();
+  const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+  if (!user || user.role !== "LOAN_CONSULTANT") return { error: "Invite account not found." };
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+
+  await createSession(user.id);
+  redirect("/consultant/pipeline");
 }

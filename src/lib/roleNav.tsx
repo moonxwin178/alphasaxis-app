@@ -110,6 +110,11 @@ export const AGENCY_TABS: TabDef[] = [
   { href: "/agency/nft", label: "NFT", icon: icons.shield },
 ];
 
+export const CONSULTANT_TABS: TabDef[] = [
+  { href: "/consultant/pipeline", label: "Pipeline", icon: icons.pipeline },
+  { href: "/consultant/profile", label: "Profile", icon: icons.user },
+];
+
 export const ADMIN_TABS: TabDef[] = [
   { href: "/admin/users", label: "Users", icon: icons.check },
   { href: "/admin/cases", label: "Cases", icon: icons.cases },

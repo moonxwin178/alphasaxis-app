@@ -5,7 +5,6 @@ import { AppHeader } from "@/components/AppHeader";
 import { CaseTracker } from "@/components/CaseTracker";
 import { AdvanceStageButton } from "@/components/AdvanceStageButton";
 import { CaseDocUploadForm } from "@/components/CaseDocUploadForm";
-import { commissionRatePercent } from "@/lib/commission";
 
 const FINANCING_LABEL: Record<string, string> = {
   MORTGAGE: "Home loan",
@@ -31,13 +30,13 @@ export default async function AgentCaseDetailPage({ params }: { params: Promise<
       applicant: { select: { name: true, phone: true } },
       documents: { orderBy: { createdAt: "asc" } },
       events: { orderBy: { createdAt: "asc" } },
-      commissions: true,
+      commissionLines: { where: { recipientId: user.id } },
     },
   });
 
   if (!theCase || !agentProfile || theCase.agentId !== agentProfile.id) notFound();
 
-  const commission = theCase.commissions[0];
+  const yourCommission = theCase.commissionLines.reduce((sum, l) => sum + Number(l.amount), 0);
   const nextLabel = NEXT_STAGE_LABEL[theCase.status];
 
   return (
@@ -57,13 +56,10 @@ export default async function AgentCaseDetailPage({ params }: { params: Promise<
           <p className="row-sub">{theCase.applicant.phone ?? "No phone on file"}</p>
         </div>
 
-        {commission && (
+        {yourCommission > 0 && (
           <div className="card" style={{ borderColor: "rgba(158,124,69,.4)" }}>
-            <p className="row-title mb-1">Estimated commission</p>
-            <p className="row-sub">
-              RM {Number(commission.amount).toLocaleString()} ({commissionRatePercent(theCase.financingType)} base
-              rate × your NFT tier multiplier)
-            </p>
+            <p className="row-title mb-1">Your commission</p>
+            <p className="row-sub">RM {yourCommission.toLocaleString()}, across {theCase.commissionLines.length} line item(s)</p>
           </div>
         )}
 

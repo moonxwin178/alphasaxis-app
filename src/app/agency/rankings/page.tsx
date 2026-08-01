@@ -7,12 +7,32 @@ export default async function AgencyRankingsPage() {
   const prisma = getPrisma();
 
   const [agencies, myAgency] = await Promise.all([
-    prisma.agency.findMany({ include: { commissions: true } }),
+    prisma.agency.findMany({
+      include: { agencyAgent: { where: { status: "ACTIVE" }, select: { userId: true } } },
+    }),
     prisma.agency.findUnique({ where: { ownerId: owner.id } }),
   ]);
 
+  const allRosterIds = agencies.flatMap((a) => [a.ownerId, ...a.agencyAgent.map((m) => m.userId)]);
+  const lines = await prisma.commissionLineItem.findMany({
+    where: { recipientId: { in: allRosterIds } },
+    select: { recipientId: true, amount: true },
+  });
+  const amountByUser = new Map<string, number>();
+  for (const l of lines) {
+    if (!l.recipientId) continue;
+    amountByUser.set(l.recipientId, (amountByUser.get(l.recipientId) ?? 0) + Number(l.amount));
+  }
+
   const ranked = agencies
-    .map((a) => ({ id: a.id, name: a.name, volume: a.commissions.reduce((s, c) => s + Number(c.amount), 0) }))
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      volume: [a.ownerId, ...a.agencyAgent.map((m) => m.userId)].reduce(
+        (sum, userId) => sum + (amountByUser.get(userId) ?? 0),
+        0
+      ),
+    }))
     .sort((a, b) => b.volume - a.volume);
 
   return (

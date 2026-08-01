@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { AdminKycRow } from "@/components/AdminKycRow";
 import { AdminRoleAppRow } from "@/components/AdminRoleAppRow";
 import { AdminTopUpRow } from "@/components/AdminTopUpRow";
+import { InviteConsultantForm } from "@/components/InviteConsultantForm";
 
 const STATUS_BADGE: Record<string, string> = {
   VERIFIED: '<span class="badge green">Approved</span>',
@@ -37,6 +38,9 @@ export default async function AdminUsersPage() {
     <div>
       <AppHeader title="User Approval" />
       <div className="px-4 pt-4">
+        <p className="eyebrow">Loan consultants</p>
+        <InviteConsultantForm />
+
         {roleApplications.length > 0 && (
           <>
             <p className="eyebrow">Agent / agency applications</p>

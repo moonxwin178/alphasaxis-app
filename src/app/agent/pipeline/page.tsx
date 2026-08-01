@@ -2,7 +2,6 @@ import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
-import { commissionRatePercent } from "@/lib/commission";
 
 const FINANCING_LABEL: Record<string, string> = {
   MORTGAGE: "Home loan",
@@ -38,7 +37,10 @@ export default async function AgentPipelinePage() {
 
   const cases = await prisma.case.findMany({
     where: { agentId: agentProfile.id },
-    include: { applicant: { select: { name: true } }, commissions: true },
+    include: {
+      applicant: { select: { name: true } },
+      commissionLines: { where: { recipientId: user.id } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -49,7 +51,7 @@ export default async function AgentPipelinePage() {
         {cases.length === 0 && <p className="p-note">No cases assigned to you yet.</p>}
         {cases.map((c) => {
           const badge = STATUS_BADGE[c.status] ?? { cls: "badge amber", label: c.status };
-          const commission = c.commissions[0];
+          const yourCommission = c.commissionLines.reduce((sum, l) => sum + Number(l.amount), 0);
           return (
             <Link key={c.id} href={`/agent/pipeline/${c.id}`} className="row">
               <div className="row-icon">
@@ -64,7 +66,7 @@ export default async function AgentPipelinePage() {
                 </p>
                 <p className="row-sub">
                   Case #{c.id.slice(0, 8).toUpperCase()} · {c.applicant.name}
-                  {commission && ` · Est. commission RM ${Number(commission.amount).toLocaleString()} (${commissionRatePercent(c.financingType)})`}
+                  {yourCommission > 0 && ` · Your commission RM ${yourCommission.toLocaleString()}`}
                 </p>
               </div>
               <div className="row-right">

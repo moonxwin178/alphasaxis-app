@@ -6,6 +6,7 @@ const HOME_BY_ROLE: Record<string, string> = {
   USER: "/cases",
   AGENT: "/agent/pipeline",
   AGENCY: "/agency/agents",
+  LOAN_CONSULTANT: "/consultant/pipeline",
   ADMIN: "/admin/users",
 };
 

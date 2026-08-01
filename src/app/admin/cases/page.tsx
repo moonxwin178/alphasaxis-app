@@ -3,6 +3,8 @@ import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { AdminCaseRow } from "@/components/AdminCaseRow";
 import { AssignAgentControl } from "@/components/AssignAgentControl";
+import { ConsultantAssignControl } from "@/components/ConsultantAssignControl";
+import { DisburseCaseControl } from "@/components/DisburseCaseControl";
 
 const FINANCING_LABEL: Record<string, string> = {
   MORTGAGE: "Home loan",
@@ -15,13 +17,14 @@ export default async function AdminCasesPage() {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
-  const [cases, agents] = await Promise.all([
+  const [cases, agents, consultants] = await Promise.all([
     prisma.case.findMany({
       include: { applicant: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 30,
     }),
     prisma.agentProfile.findMany({ include: { user: { select: { name: true } } } }),
+    prisma.user.findMany({ where: { role: "LOAN_CONSULTANT" }, select: { id: true, name: true } }),
   ]);
 
   const agentOptions = agents.map((a) => ({ id: a.id, name: a.user.name }));
@@ -40,6 +43,12 @@ export default async function AdminCasesPage() {
               status={c.status}
             />
             {c.status === "SUBMITTED" && <AssignAgentControl caseId={c.id} agents={agentOptions} />}
+            {c.status === "APPROVED" && c.servicingMode === "UNDECIDED" && (
+              <ConsultantAssignControl caseId={c.id} consultants={consultants} />
+            )}
+            {c.status === "APPROVED" && c.servicingMode !== "UNDECIDED" && (
+              <DisburseCaseControl caseId={c.id} />
+            )}
           </div>
         ))}
       </div>

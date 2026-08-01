@@ -3,23 +3,28 @@ import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { AdminPayoutsPanel } from "@/components/AdminPayoutsPanel";
 
+const ROLE_LABEL: Record<string, string> = {
+  LEAD_PROVIDER: "Lead provider",
+  CALLER: "Caller",
+  CLOSER: "Closer",
+  OVERRIDE_INTRODUCER: "Introducer override",
+  OVERRIDE_UPLINE: "Upline override",
+  OVERRIDE_CONSULTANT: "Consultant override",
+};
+
 export default async function AdminPayoutsPage() {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
-  const pendingCommissions = await prisma.commission.findMany({
-    where: { status: "PENDING" },
-    include: { case: { select: { id: true } } },
+  // Only recipient-bound lines are payable to a person — AES/Treasury/
+  // platform lines have no recipient and are house accounting, not payouts.
+  const pendingLines = await prisma.commissionLineItem.findMany({
+    where: { status: "PENDING", recipientId: { not: null } },
+    include: { case: { select: { id: true } }, recipient: { select: { name: true } } },
     orderBy: { computedAt: "desc" },
   });
 
-  const agentProfiles = await prisma.agentProfile.findMany({
-    where: { id: { in: pendingCommissions.map((c) => c.agentId) } },
-    include: { user: { select: { name: true } } },
-  });
-  const agentNameById = new Map(agentProfiles.map((a) => [a.id, a.user.name]));
-
-  const totalPending = pendingCommissions.reduce((sum, c) => sum + Number(c.amount), 0);
+  const totalPending = pendingLines.reduce((sum, c) => sum + Number(c.amount), 0);
 
   return (
     <div>
@@ -34,11 +39,11 @@ export default async function AdminPayoutsPage() {
           </div>
         </div>
         <AdminPayoutsPanel
-          pending={pendingCommissions.map((c) => ({
-            id: c.id,
-            agentName: agentNameById.get(c.agentId) ?? "Unknown agent",
-            caseRef: `Case #${c.case.id.slice(0, 8).toUpperCase()}`,
-            amount: Number(c.amount),
+          pending={pendingLines.map((l) => ({
+            id: l.id,
+            agentName: `${l.recipient?.name ?? "Unknown"} — ${ROLE_LABEL[l.role] ?? l.role}`,
+            caseRef: `Case #${l.case.id.slice(0, 8).toUpperCase()}`,
+            amount: Number(l.amount),
           }))}
         />
       </div>
