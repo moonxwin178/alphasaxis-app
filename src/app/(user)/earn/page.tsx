@@ -57,6 +57,22 @@ export default async function EarnPage() {
           </Link>
         </div>
 
+        <Link
+          href="/earn/mine"
+          className="card !mb-0 flex items-center gap-3 border-[var(--gold-light)] bg-[linear-gradient(135deg,rgba(255,218,164,0.1),rgba(158,124,69,0.04))]"
+        >
+          <div className="card-icon !m-0 bg-[linear-gradient(135deg,var(--gold-light),var(--gold))] text-[#241505]">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              <circle cx="12" cy="12" r="8" />
+              <path d="M12 8v8M9 10.5l6 3M15 10.5l-6 3" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="row-title">Agent2Mine</p>
+            <p className="row-sub">Mine real $AXIS from receipts and ad spend</p>
+          </div>
+        </Link>
+
         <div className="grid2">
           <Link href="/earn/spend" className="card !mb-0 cursor-pointer text-center">
             <div className="card-icon">

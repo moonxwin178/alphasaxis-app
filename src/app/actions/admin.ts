@@ -11,6 +11,7 @@ import { sendNotificationEmail } from "@/lib/email";
 import { generateUniqueReferralCode } from "@/lib/referral";
 import { createConsultantInviteToken } from "@/lib/inviteToken";
 import { EMAIL_PATTERN, stripControlChars } from "@/lib/apiSecurity";
+import { getEmissionSnapshot, type MiningTier } from "@/lib/axisEmission";
 
 export type AdminFormState = { error?: string } | undefined;
 
@@ -250,6 +251,75 @@ export async function resolveDispute(disputeId: string, note: string): Promise<A
   });
 
   revalidatePath("/admin/disputes");
+  return undefined;
+}
+
+/**
+ * Approves (or rejects) an Agent2Mine submission. On approval, the award is
+ * clamped to the user's remaining PerUserMonthlyCap for this calendar month
+ * — the sinking-fund emission model (src/lib/axisEmission.ts) exists
+ * specifically so no single user can drain the pool faster than the
+ * 60-month vesting horizon allows. requestedAmount lets the admin propose a
+ * specific award (e.g. matching the actual subsidy/spend); it's silently
+ * capped, never rejected outright, so admins don't need to pre-calculate
+ * the exact cap themselves.
+ */
+export async function reviewMiningSubmission(
+  submissionId: string,
+  action: "approve" | "reject",
+  requestedAmount?: number
+): Promise<AdminFormState> {
+  const admin = await requireRole("ADMIN");
+  const prisma = getPrisma();
+
+  const submission = await prisma.axisMiningSubmission.findUnique({ where: { id: submissionId } });
+  if (!submission) return { error: "Submission not found." };
+  if (submission.status === "APPROVED" || submission.status === "REJECTED") {
+    return { error: "This submission has already been reviewed." };
+  }
+
+  if (action === "reject") {
+    await prisma.axisMiningSubmission.update({
+      where: { id: submissionId },
+      data: { status: "REJECTED", reviewedById: admin.id, reviewedAt: new Date() },
+    });
+    revalidatePath("/admin/mining");
+    return undefined;
+  }
+
+  const tier = (await resolveBrokerageTier(submission.userId)) as MiningTier;
+  const snapshot = await getEmissionSnapshot();
+  if (!snapshot) return { error: "Emission pool is not configured." };
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const awardedThisMonthAgg = await prisma.axisVestingLedgerEntry.aggregate({
+    where: { userId: submission.userId, source: "AGENT2MINE_TASK", createdAt: { gte: monthStart } },
+    _sum: { delta: true },
+  });
+  const alreadyAwarded = Number(awardedThisMonthAgg._sum.delta ?? 0);
+  const remainingCap = Math.max(0, snapshot.capByTier[tier] - alreadyAwarded);
+
+  if (remainingCap <= 0) {
+    return { error: "This user has already reached their Agent2Mine cap for this month." };
+  }
+
+  const proposed = requestedAmount && requestedAmount > 0 ? requestedAmount : remainingCap;
+  const finalAmount = Math.min(proposed, remainingCap);
+
+  await prisma.$transaction([
+    prisma.axisMiningSubmission.update({
+      where: { id: submissionId },
+      data: { status: "APPROVED", axisAwarded: finalAmount, reviewedById: admin.id, reviewedAt: new Date() },
+    }),
+    prisma.axisVestingLedgerEntry.create({
+      data: { userId: submission.userId, delta: finalAmount, source: "AGENT2MINE_TASK", refId: submissionId },
+    }),
+  ]);
+
+  revalidatePath("/admin/mining");
   return undefined;
 }
 

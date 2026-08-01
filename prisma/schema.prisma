@@ -199,6 +199,10 @@ model User {
   commissionsSourced MembershipCommission[] @relation("MembershipCommissionSource")
   walletTopUps      WalletTopUpRequest[]
   walletLedger      WalletLedgerEntry[]
+  axisMiningSubmissions     AxisMiningSubmission[]         @relation("MiningSubmissionUser")
+  reviewedMiningSubmissions AxisMiningSubmission[]         @relation("MiningSubmissionReviewer")
+  axisVestingLedger         AxisVestingLedgerEntry[]
+  axisPrestigeLines         AxisPrestigeDistributionLine[]
 
   @@index([role])
 }
@@ -583,4 +587,131 @@ model Dispute {
   resolvedById   String?
   resolvedBy     User?         @relation("DisputeResolvedBy", fields: [resolvedById], references: [id])
   createdAt      DateTime      @default(now())
+}
+
+// ============================================================================
+// Agent2Mine — Spend-to-Earn $AXIS mining, separate from the gamified
+// PointsLedgerEntry system above. Real numbers confirmed: Agent2Mine
+// Incentive Pool = 32% of 178B total $AXIS supply = 56.96B tokens, anchor
+// price $0.0005 for this pool specifically, 60-month (5yr) vesting horizon.
+// See src/lib/axisEmission.ts for the sinking-fund emission math this
+// ledger feeds into.
+// ============================================================================
+
+enum AxisMiningTaskType {
+  PETROL_RECEIPT
+  META_ADS_ONBOARDING
+}
+
+enum AxisMiningStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED_DUPLICATE
+}
+
+enum MetaAdsCategory {
+  PROPERTY_LOAN_LEADGEN
+  GENERAL
+}
+
+enum AxisLedgerSource {
+  AGENT2MINE_TASK
+  AXISPRESTIGE_QUARTERLY
+  ADMIN_ADJUST
+}
+
+// One row per Spend-to-Earn submission. Duplicate-receipt fraud detection
+// (perceptualHash + receiptNumber, see src/lib/receiptFraud.ts) runs and can
+// auto-flag before an admin ever reviews it. OCR-based field verification is
+// NOT implemented — no vision API credentials — so merchantName/receiptNumber/
+// subsidyAmountRm are user-entered and admin-verified against the uploaded
+// image manually, same "pending manual review" pattern as KycSubmission.
+model AxisMiningSubmission {
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation("MiningSubmissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  taskType        AxisMiningTaskType
+  status          AxisMiningStatus   @default(PENDING)
+  blobPath        String
+
+  // PETROL_RECEIPT fields
+  merchantName    String?
+  receiptNumber   String?
+  subsidyAmountRm Decimal?           @db.Decimal(10, 2)
+  perceptualHash  String?
+
+  // META_ADS_ONBOARDING fields
+  metaAdsCategory MetaAdsCategory?
+  metaAdsSpendUsd Decimal?           @db.Decimal(10, 2)
+
+  axisAwarded     Decimal?           @db.Decimal(18, 4)
+  duplicateOfId   String?
+  reviewedById    String?
+  reviewer        User?              @relation("MiningSubmissionReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime           @default(now())
+
+  @@index([userId])
+  @@index([perceptualHash])
+  @@index([receiptNumber])
+  @@index([status])
+}
+
+// Append-only $AXIS earnings ledger — same idempotent SUM(delta) pattern as
+// PointsLedgerEntry/WalletLedgerEntry. Balance here represents tokens earned
+// but not yet distributed on-chain (no wallet/contract integration in beta).
+model AxisVestingLedgerEntry {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Decimal          @db.Decimal(18, 4)
+  source    AxisLedgerSource
+  refId     String?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+}
+
+// Single configuration row for the Agent2Mine sinking-fund emission model.
+// totalPoolTokens/vestingMonths/anchorPriceUsd are the confirmed real
+// numbers; startDate anchors "how many months have elapsed" for the
+// RemainingMonths term. Admin-editable in principle, but beta ships with one
+// seeded row — see src/lib/axisEmission.ts.
+model AxisMiningPoolConfig {
+  id              String   @id @default(cuid())
+  totalPoolTokens Decimal  @db.Decimal(20, 4)
+  vestingMonths   Int
+  startDate       DateTime
+  anchorPriceUsd  Decimal  @db.Decimal(10, 6)
+  createdAt       DateTime @default(now())
+}
+
+// AxisPrestige quarterly distribution — a distinct mechanism from Agent2Mine
+// task-based mining. Draws from the "Early Backers" allocation (18% of 178B
+// = 32.04B tokens) and pays out to AxisPrestige node holders each quarter,
+// not per-task.
+model AxisPrestigeDistribution {
+  id                     String                         @id @default(cuid())
+  quarterLabel           String
+  totalDistributedTokens Decimal                        @db.Decimal(20, 4)
+  perNodeAmount          Decimal                        @db.Decimal(18, 4)
+  createdById            String?
+  createdAt              DateTime                       @default(now())
+
+  lines AxisPrestigeDistributionLine[]
+}
+
+model AxisPrestigeDistributionLine {
+  id             String                   @id @default(cuid())
+  distributionId String
+  distribution   AxisPrestigeDistribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                     @relation(fields: [userId], references: [id])
+  nftHoldingId   String
+  amount         Decimal                  @db.Decimal(18, 4)
+
+  @@index([distributionId])
+  @@index([userId])
 }
