@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
+import { AgentEntitlementsCard } from "@/components/AgentEntitlementsCard";
 
 const FINANCING_LABEL: Record<string, string> = {
   MORTGAGE: "Home loan",
@@ -47,7 +48,8 @@ export default async function AgentPipelinePage() {
   return (
     <div>
       <AppHeader title="Case Pipeline" />
-      <div className="px-4 pt-4">
+      <div className="flex flex-col gap-4 px-4 pt-4">
+        <AgentEntitlementsCard userId={user.id} />
         {cases.length === 0 && <p className="p-note">No cases assigned to you yet.</p>}
         {cases.map((c) => {
           const badge = STATUS_BADGE[c.status] ?? { cls: "badge amber", label: c.status };

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
+import { UserEntitlementsCard } from "@/components/UserEntitlementsCard";
+import { PrestigeEntitlementsCard } from "@/components/PrestigeEntitlementsCard";
 
 const STATUS_BADGE: Record<string, { cls: string; label: string }> = {
   SUBMITTED: { cls: "badge amber", label: "Submitted" },
@@ -37,6 +39,9 @@ export default async function CasesPage() {
     <div>
       <AppHeader title="Active Cases" />
       <div className="flex flex-col gap-4 px-4 pt-4">
+        <UserEntitlementsCard userId={user.id} />
+        <PrestigeEntitlementsCard userId={user.id} />
+
         <div className="stat-grid !mb-0">
           <div className="stat">
             <div className="label">Active cases</div>

@@ -7,6 +7,7 @@ import { AdminRoleAppRow } from "@/components/AdminRoleAppRow";
 import { AdminTopUpRow } from "@/components/AdminTopUpRow";
 import { InviteConsultantForm } from "@/components/InviteConsultantForm";
 import { LogoutButton } from "@/components/LogoutButton";
+import { AdminPlatformMetricsCard } from "@/components/AdminPlatformMetricsCard";
 
 const STATUS_BADGE: Record<string, string> = {
   VERIFIED: '<span class="badge green">Approved</span>',
@@ -39,7 +40,9 @@ export default async function AdminUsersPage() {
   return (
     <div>
       <AppHeader title="User Approval" />
-      <div className="px-4 pt-4">
+      <div className="flex flex-col gap-4 px-4 pt-4">
+        <AdminPlatformMetricsCard />
+
         <Link href="/admin/mining" className="row">
           <div className="min-w-0 flex-1">
             <p className="row-title">Agent2Mine review</p>

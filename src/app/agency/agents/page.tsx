@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { InviteAgentForm } from "@/components/InviteAgentForm";
+import { AgencyEntitlementsCard } from "@/components/AgencyEntitlementsCard";
 
 export default async function AgencyAgentsPage() {
   const owner = await requireRole("AGENCY");
@@ -30,8 +31,10 @@ export default async function AgencyAgentsPage() {
   return (
     <div>
       <AppHeader title="Agent Management" />
-      <div className="px-4 pt-4">
-        <div className="stat-grid">
+      <div className="flex flex-col gap-4 px-4 pt-4">
+        <AgencyEntitlementsCard ownerId={owner.id} />
+
+        <div className="stat-grid !mb-0">
           <div className="stat">
             <div className="label">Managed agents</div>
             <div className="value">{roster.length}</div>
