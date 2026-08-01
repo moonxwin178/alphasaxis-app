@@ -9,6 +9,7 @@ import { TierRing } from "@/components/TierRing";
 import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
 import { getWalletBalance } from "@/lib/wallet";
 import { PhoneEditRow } from "@/components/PhoneEditRow";
+import { getAxisVestingBalance } from "@/lib/axisEmission";
 
 const KYC_BADGE: Record<string, string> = {
   NOT_SUBMITTED: '<span class="badge amber">Not submitted</span>',
@@ -36,6 +37,9 @@ export default async function ProfilePage() {
   ]);
   const currentTier = nftHolding?.tier ?? "AXIS_ZERO";
   const hasPrestige = nftHolding?.tier === "AXIS_PRESTIGE";
+  const prestigeEarnings = hasPrestige
+    ? await getAxisVestingBalance(user.id, "AXISPRESTIGE_QUARTERLY")
+    : 0;
 
   const initials = self.name
     .split(" ")
@@ -106,6 +110,11 @@ export default async function ProfilePage() {
               <Link href="/nft-verification?return=/profile" className="btn secondary mt-2.5 !mb-0">
                 Verify an AxisPrestige Node
               </Link>
+            )}
+            {hasPrestige && (
+              <p className="p-note mt-2.5 !mb-0 text-[var(--green)]">
+                {prestigeEarnings.toLocaleString()} $AXIS earned from quarterly node distributions.
+              </p>
             )}
           </div>
         </div>

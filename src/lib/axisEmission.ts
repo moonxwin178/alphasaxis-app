@@ -1,5 +1,6 @@
 import "server-only";
 import { getPrisma } from "./prisma";
+import type { AxisLedgerSource } from "@/generated/prisma/client";
 
 /**
  * Sinking-fund emission model for the Agent2Mine Incentive Pool.
@@ -75,11 +76,11 @@ export async function getOrCreatePoolConfig() {
   });
 }
 
-/** A user's earned-but-not-yet-distributed $AXIS balance — SUM(delta) over their vesting ledger, same pattern as getPointsBalance/getWalletBalance. */
-export async function getAxisVestingBalance(userId: string): Promise<number> {
+/** A user's earned-but-not-yet-distributed $AXIS balance — SUM(delta) over their vesting ledger, same pattern as getPointsBalance/getWalletBalance. Pass `source` to isolate Agent2Mine mining from AxisPrestige quarterly distributions — they're deliberately separate mechanisms. */
+export async function getAxisVestingBalance(userId: string, source?: AxisLedgerSource): Promise<number> {
   const prisma = getPrisma();
   const result = await prisma.axisVestingLedgerEntry.aggregate({
-    where: { userId },
+    where: source ? { userId, source } : { userId },
     _sum: { delta: true },
   });
   return Number(result._sum.delta ?? 0);

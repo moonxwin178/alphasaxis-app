@@ -12,6 +12,7 @@ import { generateUniqueReferralCode } from "@/lib/referral";
 import { createConsultantInviteToken } from "@/lib/inviteToken";
 import { EMAIL_PATTERN, stripControlChars } from "@/lib/apiSecurity";
 import { getEmissionSnapshot, type MiningTier } from "@/lib/axisEmission";
+import { createAxisPrestigeDistribution } from "@/lib/axisPrestigeDistribution";
 
 export type AdminFormState = { error?: string } | undefined;
 
@@ -320,6 +321,32 @@ export async function reviewMiningSubmission(
   ]);
 
   revalidatePath("/admin/mining");
+  return undefined;
+}
+
+/**
+ * Runs one AxisPrestige quarterly distribution — split evenly across all
+ * verified node holders. Intentionally a manual admin trigger, not a cron:
+ * exact quarterly cadence/schedule and how much of the 32.04B Early Backers
+ * pool to release each time are business decisions, not something to
+ * automate without the user's sign-off (flagged in the delivery summary).
+ */
+export async function runAxisPrestigeDistribution(
+  quarterLabel: string,
+  totalDistributedTokens: number
+): Promise<AdminFormState> {
+  const admin = await requireRole("ADMIN");
+
+  const cleanLabel = stripControlChars(quarterLabel).slice(0, 20);
+  if (!cleanLabel) return { error: "Enter a quarter label (e.g. Q1 2027)." };
+  if (!Number.isFinite(totalDistributedTokens) || totalDistributedTokens <= 0) {
+    return { error: "Enter a valid token amount to distribute." };
+  }
+
+  const result = await createAxisPrestigeDistribution(cleanLabel, totalDistributedTokens, admin.id);
+  if ("error" in result) return { error: result.error };
+
+  revalidatePath("/admin/axisprestige");
   return undefined;
 }
 

@@ -50,6 +50,17 @@ export default async function AdminUsersPage() {
             </svg>
           </div>
         </Link>
+        <Link href="/admin/axisprestige" className="row">
+          <div className="min-w-0 flex-1">
+            <p className="row-title">AxisPrestige distribution</p>
+            <p className="row-sub">Run quarterly node-holder payouts</p>
+          </div>
+          <div className="chev">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </div>
+        </Link>
 
         <p className="eyebrow mt-2">Loan consultants</p>
         <InviteConsultantForm />

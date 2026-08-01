@@ -22,7 +22,7 @@ export default async function EarnMinePage() {
   const prisma = getPrisma();
 
   const [balance, submissions] = await Promise.all([
-    getAxisVestingBalance(user.id),
+    getAxisVestingBalance(user.id, "AGENT2MINE_TASK"),
     prisma.axisMiningSubmission.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
   ]);
 
