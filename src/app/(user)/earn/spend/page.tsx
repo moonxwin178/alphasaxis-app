@@ -1,13 +1,17 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { SpendProofForm } from "@/components/SpendProofForm";
+import { PetrolBrandIcon } from "@/components/PetrolBrandIcon";
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: '<span class="badge amber">Review</span>',
   VERIFIED: '<span class="badge green">Approved</span>',
   REJECTED: '<span class="badge red">Rejected</span>',
 };
+
+const PETROL_BRANDS = ["Shell", "Petron", "Petronas"] as const;
 
 export default async function EarnSpendPage() {
   const user = await requireRole("USER");
@@ -26,6 +30,32 @@ export default async function EarnSpendPage() {
           submission manually.
         </p>
         <SpendProofForm />
+
+        <p className="eyebrow mt-6">Petrol subsidy — real $AXIS, not points</p>
+        <p className="p-note !mb-1">
+          These deposit your government petrol subsidy into your Agent2Mine pool — a separate, bigger reward than
+          the generic upload above. Pick your station.
+        </p>
+        {PETROL_BRANDS.map((brand) => (
+          <Link
+            key={brand}
+            href={`/earn/mine?station=${brand}#petrol-form`}
+            className="row"
+          >
+            <div className="row-icon !bg-white">
+              <PetrolBrandIcon brand={brand} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="row-title">Petrol Subsidy for {brand}</p>
+              <p className="row-sub">Deposits to your mining pool</p>
+            </div>
+            <div className="chev">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </div>
+          </Link>
+        ))}
 
         <p className="eyebrow mt-6">Past submissions</p>
         {submissions.length === 0 && <p className="p-note">No submissions yet.</p>}

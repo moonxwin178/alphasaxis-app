@@ -1,11 +1,20 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/dal";
-import { getSubmitTaskStatus } from "@/app/actions/earn";
+import { getInsuranceLeads, getSubmitTaskStatus } from "@/app/actions/earn";
 import { AppHeader } from "@/components/AppHeader";
 import { ClaimTaskButton } from "@/components/ClaimTaskButton";
+import { InsuranceLeadForm } from "@/components/InsuranceLeadForm";
+
+const LEAD_STATUS_BADGE: Record<string, string> = {
+  PENDING: '<span class="badge amber">Pending</span>',
+  CONTACTED: '<span class="badge amber">Contacted</span>',
+  CONVERTED: '<span class="badge green">Converted</span>',
+  DECLINED: '<span class="badge red">Declined</span>',
+};
 
 export default async function EarnSubmitPage() {
   const user = await requireRole("USER");
-  const tasks = await getSubmitTaskStatus(user.id);
+  const [tasks, leads] = await Promise.all([getSubmitTaskStatus(user.id), getInsuranceLeads(user.id)]);
   const completedCount = tasks.filter((t) => t.claimed).length;
 
   return (
@@ -28,13 +37,38 @@ export default async function EarnSubmitPage() {
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="row-title">{t.label}</p>
+              {t.claimed ? (
+                <p className="row-title">{t.label}</p>
+              ) : (
+                <Link href={t.href} className="row-title" style={{ textDecoration: "underline" }}>
+                  {t.label}
+                </Link>
+              )}
               <p className="row-sub">+{t.points} pts</p>
             </div>
             <ClaimTaskButton taskKey={t.key} eligible={t.eligible} claimed={t.claimed} />
           </div>
         ))}
-        <p className="p-note mt-2.5">More task types unlock once you have active cases with an assigned agent.</p>
+        <p className="p-note mt-2.5">Tasks unlock automatically once the real action behind them is done — tap a task to go do it.</p>
+
+        <div className="mt-4">
+          <InsuranceLeadForm />
+        </div>
+
+        {leads.length > 0 && (
+          <div className="mt-4">
+            <p className="eyebrow">Your insurance leads</p>
+            {leads.map((l) => (
+              <div key={l.id} className="row">
+                <div className="min-w-0 flex-1">
+                  <p className="row-title">{l.contactName}</p>
+                  <p className="row-sub">{l.insuranceType} · {new Date(l.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="row-right" dangerouslySetInnerHTML={{ __html: LEAD_STATUS_BADGE[l.status] }} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

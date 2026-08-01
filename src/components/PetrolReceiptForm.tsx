@@ -9,11 +9,12 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function PetrolReceiptForm() {
+export function PetrolReceiptForm({ defaultStation }: { defaultStation?: string } = {}) {
   const [state, action, pending] = useActionState(submitPetrolReceipt, undefined);
+  const preset = MERCHANTS.find((m) => m.toLowerCase() === defaultStation?.toLowerCase());
 
   return (
-    <form action={action} className="card">
+    <form action={action} className="card" id="petrol-form">
       <p className="row-title mb-2">Petrol subsidy receipt</p>
       <p className="p-note mb-2">
         Only receipts from this calendar month are eligible — the government subsidy portion is calculated
@@ -21,7 +22,7 @@ export function PetrolReceiptForm() {
       </p>
       <div className="field">
         <label htmlFor="merchantName">Station</label>
-        <select id="merchantName" name="merchantName" required defaultValue="">
+        <select id="merchantName" name="merchantName" required defaultValue={preset ?? ""}>
           <option value="" disabled>
             Select station
           </option>

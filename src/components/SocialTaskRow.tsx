@@ -1,7 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
-import { claimSocialTask } from "@/app/actions/earn";
+import { useState, useTransition } from "react";
+import { claimSocialTask, startSocialTask } from "@/app/actions/earn";
 
 export function SocialTaskRow({
   taskKey,
@@ -9,14 +9,17 @@ export function SocialTaskRow({
   points,
   href,
   claimed,
+  started,
 }: {
   taskKey: string;
   label: string;
   points: number;
   href: string;
   claimed: boolean;
+  started: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const [visited, setVisited] = useState(started);
 
   return (
     <div className="row">
@@ -28,17 +31,29 @@ export function SocialTaskRow({
         </svg>
       </div>
       <div className="min-w-0 flex-1">
-        <a href={href} target="_blank" rel="noopener noreferrer" className="row-title" style={{ textDecoration: "underline" }}>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="row-title"
+          style={{ textDecoration: "underline" }}
+          onClick={() => {
+            setVisited(true);
+            void startSocialTask(taskKey);
+          }}
+        >
           {label}
         </a>
-        <p className="row-sub">+{points} pts</p>
+        <p className="row-sub">
+          +{points} pts{!claimed && !visited ? " · tap to go, then come back" : ""}
+        </p>
       </div>
       {claimed ? (
         <span className="badge green">Claimed</span>
       ) : (
         <button
-          className="row-right cursor-pointer bg-transparent"
-          disabled={pending}
+          className="row-right cursor-pointer bg-transparent disabled:opacity-40"
+          disabled={pending || !visited}
           onClick={() => startTransition(() => { void claimSocialTask(taskKey); })}
         >
           {pending ? "…" : "Claim"}

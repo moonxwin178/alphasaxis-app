@@ -2,12 +2,14 @@ import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { ReferralCodeBox } from "@/components/ReferralCodeBox";
+import { ClaimMilestoneButton } from "@/components/ClaimMilestoneButton";
+import { getReferralMilestoneStatus } from "@/lib/referralMilestones";
 
 export default async function EarnNetworkPage() {
   const user = await requireRole("USER");
   const prisma = getPrisma();
 
-  const [referred, self, commissions] = await Promise.all([
+  const [referred, self, commissions, milestones] = await Promise.all([
     prisma.user.findMany({
       where: { referredById: user.id },
       select: { id: true, name: true, role: true, createdAt: true },
@@ -19,6 +21,7 @@ export default async function EarnNetworkPage() {
       include: { sourceUser: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     }),
+    getReferralMilestoneStatus(user.id),
   ]);
 
   const pendingUsdt = commissions
@@ -46,6 +49,29 @@ export default async function EarnNetworkPage() {
             10% of the mint price when someone you referred mints (Tier 1), and 5% when your
             referral&apos;s referral mints (Tier 2) — paid in USDT.
           </p>
+        </div>
+
+        <div>
+          <p className="eyebrow">Milestone rewards ($AXIS)</p>
+          <p className="p-note !mb-1">
+            Paid as claimable $AXIS — lock it into a term at Agent2Mine to make it spendable.
+          </p>
+          {milestones.map((m) => (
+            <div key={m.key} className="row">
+              <div className="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
+                  <path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="row-title">{m.label}</p>
+                <p className="row-sub">
+                  {Math.min(m.progress, m.threshold)}/{m.threshold} · +{m.rewardAxis.toLocaleString()} $AXIS
+                </p>
+              </div>
+              <ClaimMilestoneButton milestoneKey={m.key} eligible={m.eligible} claimed={m.claimed} />
+            </div>
+          ))}
         </div>
 
         <div>

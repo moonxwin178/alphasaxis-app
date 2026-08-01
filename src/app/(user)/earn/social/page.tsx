@@ -63,7 +63,15 @@ export default async function EarnSocialPage() {
 
         <p className="eyebrow mt-4">Follow & join</p>
         {socialTasks.map((t) => (
-          <SocialTaskRow key={t.key} taskKey={t.key} label={t.label} points={t.points} href={t.href} claimed={t.claimed} />
+          <SocialTaskRow
+            key={t.key}
+            taskKey={t.key}
+            label={t.label}
+            points={t.points}
+            href={t.href}
+            claimed={t.claimed}
+            started={t.started}
+          />
         ))}
       </div>
     </div>

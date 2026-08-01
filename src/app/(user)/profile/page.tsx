@@ -83,20 +83,40 @@ export default async function ProfilePage() {
 
         <div>
           <p className="eyebrow">Settings</p>
-          <div className="row">
-            <div className="row-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
-                <path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z" />
-              </svg>
+          {kyc?.status === "VERIFIED" ? (
+            <div className="row">
+              <div className="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
+                  <path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="row-title">KYC status</p>
+              </div>
+              <div className="row-right" dangerouslySetInnerHTML={{ __html: KYC_BADGE.VERIFIED }} />
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="row-title">KYC status</p>
-            </div>
-            <div
-              className="row-right"
-              dangerouslySetInnerHTML={{ __html: KYC_BADGE[kyc?.status ?? "NOT_SUBMITTED"] }}
-            />
-          </div>
+          ) : (
+            <Link href="/kyc" className="row">
+              <div className="row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
+                  <path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="row-title">KYC status</p>
+                <p className="row-sub">Tap to {kyc?.status === "PENDING" ? "view" : "start"} verification</p>
+              </div>
+              <div
+                className="row-right"
+                dangerouslySetInnerHTML={{ __html: KYC_BADGE[kyc?.status ?? "NOT_SUBMITTED"] }}
+              />
+              <div className="chev">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </div>
+            </Link>
+          )}
           <PhoneEditRow phone={self.phone} />
         </div>
 

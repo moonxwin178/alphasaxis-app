@@ -212,6 +212,8 @@ model User {
   aesNodePoolLines          AesNodePoolDistributionLine[]
   mintCycleLedger           MintCycleLedgerEntry[]
   claimVestingSchedules     AxisClaimVestingSchedule[]
+  socialTaskClicks          SocialTaskClick[]
+  insuranceLeads            InsuranceLead[]
 
   @@index([role])
 }
@@ -434,6 +436,47 @@ model CheckIn {
   streakCount  Int
 
   @@unique([userId, date])
+}
+
+// Records that a user actually clicked through to an external social-task
+// link before letting them claim its reward — otherwise Claim could be
+// pressed with zero proof the follow/join ever happened. No API exists to
+// verify these platforms server-side, so a recorded click is the practical
+// minimum friction; see claimSocialTask in actions/earn.ts.
+model SocialTaskClick {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskKey   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, taskKey])
+}
+
+enum InsuranceLeadStatus {
+  PENDING
+  CONTACTED
+  CONVERTED
+  DECLINED
+}
+
+// Lightweight lead capture for the "submit a potential insurance deal"
+// Submit-to-Earn task — insurance isn't a modeled product line yet (no
+// Case/FinancingType coverage), so this stays a standalone lead record an
+// admin can follow up on manually, same "pending manual review" pattern as
+// KycSubmission/AxisMiningSubmission.
+model InsuranceLead {
+  id            String              @id @default(cuid())
+  submittedById String
+  submittedBy   User                @relation(fields: [submittedById], references: [id], onDelete: Cascade)
+  contactName   String
+  contactPhone  String
+  insuranceType String
+  note          String?
+  status        InsuranceLeadStatus @default(PENDING)
+  createdAt     DateTime            @default(now())
+
+  @@index([submittedById])
 }
 
 model Voucher {

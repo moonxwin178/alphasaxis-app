@@ -6,6 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { awardPoints } from "@/lib/points";
 import { uploadPrivateFile } from "@/lib/blob";
 import { mineOutForTask } from "@/lib/miningPool";
+import { claimReferralMilestone } from "@/lib/referralMilestones";
 
 export type EarnFormState = { error?: string; ok?: boolean } | undefined;
 
@@ -31,29 +32,61 @@ export async function submitSpendProof(
   return { ok: true };
 }
 
-/** Idempotent one-time checklist tied to real account state (not per-case tasks yet — see Phase B). */
+/**
+ * Idempotent one-time checklist tied to real account state — nothing here
+ * is self-declared, every task's eligibility comes from an actual DB row
+ * (a submitted KYC, an uploaded document of the right type, a case that
+ * reached a given status, a submitted insurance lead), so "Claim" only
+ * ever pays out work that already happened. `href` is where the row links
+ * to actually go do the task — matches the same "redirect to the real
+ * action, don't let Claim fire blind" rule applied to SOCIAL_TASKS below.
+ */
 const SUBMIT_TASKS = [
-  { key: "kyc_submitted", label: "Submit your identity verification", points: 50 },
-  { key: "first_case", label: "Submit your first case", points: 100 },
-  { key: "phone_added", label: "Add a phone number to your profile", points: 20 },
+  { key: "kyc_submitted", label: "Submit your identity verification", points: 50, href: "/kyc" },
+  { key: "first_case", label: "Submit your first case", points: 100, href: "/cases" },
+  { key: "case_ctos", label: "Submit your first client's CTOS report", points: 40, href: "/cases" },
+  { key: "case_ccris", label: "Submit your first client's CCRIS report", points: 40, href: "/cases" },
+  { key: "case_income_docs", label: "Submit income / payslip documents", points: 30, href: "/cases" },
+  { key: "case_bank_statement", label: "Submit bank statement documents", points: 30, href: "/cases" },
+  { key: "case_reaches_review", label: "Get a case into underwriting review", points: 50, href: "/cases" },
+  { key: "case_approved", label: "Get a case approved", points: 150, href: "/cases" },
+  { key: "insurance_lead", label: "Submit a potential insurance deal", points: 40, href: "/earn/submit#insurance" },
+  { key: "phone_added", label: "Add a phone number to your profile", points: 20, href: "/profile" },
 ] as const;
 
 export async function getSubmitTaskStatus(userId: string) {
   const prisma = getPrisma();
-  const [user, kyc, caseCount, claimed] = await Promise.all([
+  const [user, kyc, cases, documents, insuranceLeadCount, claimed] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }),
     prisma.kycSubmission.findUnique({ where: { userId } }),
-    prisma.case.count({ where: { applicantId: userId } }),
+    prisma.case.findMany({ where: { applicantId: userId }, select: { id: true, status: true } }),
+    prisma.document.findMany({
+      where: { case: { applicantId: userId } },
+      select: { docType: true },
+    }),
+    prisma.insuranceLead.count({ where: { submittedById: userId } }),
     prisma.pointsLedgerEntry.findMany({
       where: { userId, reason: "SUBMIT_TO_EARN" },
       select: { refId: true },
     }),
   ]);
 
+  const hasDocType = (...keywords: string[]) =>
+    documents.some((d) => keywords.some((kw) => d.docType.toLowerCase().includes(kw)));
+  const inReviewOrLater = cases.some((c) => ["REVIEW", "APPROVED", "DISBURSED"].includes(c.status));
+  const approved = cases.some((c) => ["APPROVED", "DISBURSED"].includes(c.status));
+
   const claimedKeys = new Set(claimed.map((c) => c.refId));
   const done: Record<string, boolean> = {
     kyc_submitted: !!kyc?.submittedAt,
-    first_case: caseCount > 0,
+    first_case: cases.length > 0,
+    case_ctos: hasDocType("ctos"),
+    case_ccris: hasDocType("ccris"),
+    case_income_docs: hasDocType("payslip", "income"),
+    case_bank_statement: hasDocType("bank"),
+    case_reaches_review: inReviewOrLater,
+    case_approved: approved,
+    insurance_lead: insuranceLeadCount > 0,
     phone_added: !!user?.phone,
   };
 
@@ -80,6 +113,34 @@ export async function claimSubmitTask(taskKey: string): Promise<EarnFormState> {
   return { ok: true };
 }
 
+export async function submitInsuranceLead(
+  _prevState: EarnFormState,
+  formData: FormData
+): Promise<EarnFormState> {
+  const user = await requireUser();
+  const contactName = String(formData.get("contactName") ?? "").trim().slice(0, 120);
+  const contactPhone = String(formData.get("contactPhone") ?? "").trim().slice(0, 30);
+  const insuranceType = String(formData.get("insuranceType") ?? "").trim().slice(0, 60);
+  const note = String(formData.get("note") ?? "").trim().slice(0, 500);
+
+  if (contactName.length < 2) return { error: "Enter the contact's name." };
+  if (contactPhone.length < 6) return { error: "Enter a valid contact phone number." };
+  if (!insuranceType) return { error: "Select an insurance type." };
+
+  const prisma = getPrisma();
+  await prisma.insuranceLead.create({
+    data: { submittedById: user.id, contactName, contactPhone, insuranceType, note: note || null },
+  });
+
+  revalidatePath("/earn/submit");
+  return { ok: true };
+}
+
+export async function getInsuranceLeads(userId: string) {
+  const prisma = getPrisma();
+  return prisma.insuranceLead.findMany({ where: { submittedById: userId }, orderBy: { createdAt: "desc" } });
+}
+
 /**
  * Standard "typical Task to Earn platform" social follows — self-declared
  * (no API verification exists for these platforms), one-time, idempotent
@@ -97,12 +158,30 @@ const SOCIAL_TASKS = [
 
 export async function getSocialTaskStatus(userId: string) {
   const prisma = getPrisma();
-  const claimed = await prisma.pointsLedgerEntry.findMany({
-    where: { userId, reason: "SOCIAL_TO_EARN", refId: { in: SOCIAL_TASKS.map((t) => t.key) } },
-    select: { refId: true },
-  });
+  const [claimed, started] = await Promise.all([
+    prisma.pointsLedgerEntry.findMany({
+      where: { userId, reason: "SOCIAL_TO_EARN", refId: { in: SOCIAL_TASKS.map((t) => t.key) } },
+      select: { refId: true },
+    }),
+    prisma.socialTaskClick.findMany({ where: { userId }, select: { taskKey: true } }),
+  ]);
   const claimedKeys = new Set(claimed.map((c) => c.refId));
-  return SOCIAL_TASKS.map((t) => ({ ...t, claimed: claimedKeys.has(t.key) }));
+  const startedKeys = new Set(started.map((s) => s.taskKey));
+  return SOCIAL_TASKS.map((t) => ({ ...t, claimed: claimedKeys.has(t.key), started: startedKeys.has(t.key) }));
+}
+
+/** Fired when the user clicks a social task's link — records that they actually went, before Claim is allowed. */
+export async function startSocialTask(taskKey: string): Promise<void> {
+  const user = await requireUser();
+  if (!SOCIAL_TASKS.some((t) => t.key === taskKey)) return;
+
+  const prisma = getPrisma();
+  await prisma.socialTaskClick.upsert({
+    where: { userId_taskKey: { userId: user.id, taskKey } },
+    update: {},
+    create: { userId: user.id, taskKey },
+  });
+  revalidatePath("/earn/social");
 }
 
 export async function claimSocialTask(taskKey: string): Promise<EarnFormState> {
@@ -111,10 +190,12 @@ export async function claimSocialTask(taskKey: string): Promise<EarnFormState> {
   if (!task) return { error: "Unknown task." };
 
   const prisma = getPrisma();
-  const existing = await prisma.pointsLedgerEntry.findFirst({
-    where: { userId: user.id, reason: "SOCIAL_TO_EARN", refId: taskKey },
-  });
+  const [existing, clicked] = await Promise.all([
+    prisma.pointsLedgerEntry.findFirst({ where: { userId: user.id, reason: "SOCIAL_TO_EARN", refId: taskKey } }),
+    prisma.socialTaskClick.findUnique({ where: { userId_taskKey: { userId: user.id, taskKey } } }),
+  ]);
   if (existing) return { error: "Already claimed." };
+  if (!clicked) return { error: "Visit the link first, then come back to claim." };
 
   await awardPoints(user.id, task.points, "SOCIAL_TO_EARN", taskKey);
   await mineOutForTask(user.id);
@@ -147,5 +228,14 @@ export async function claimDailyCheckIn(): Promise<EarnFormState> {
   await mineOutForTask(user.id);
 
   revalidatePath("/earn/social");
+  return { ok: true };
+}
+
+export async function claimReferralMilestoneAction(milestoneKey: string): Promise<EarnFormState> {
+  const user = await requireUser();
+  const result = await claimReferralMilestone(user.id, milestoneKey);
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath("/earn/network");
   return { ok: true };
 }

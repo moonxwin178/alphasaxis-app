@@ -28,9 +28,14 @@ const TASK_LABEL: Record<string, string> = {
   META_ADS_ONBOARDING: "Meta Ads onboarding",
 };
 
-export default async function EarnMinePage() {
+export default async function EarnMinePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ station?: string }>;
+}) {
   const user = await requireRole("USER");
   const prisma = getPrisma();
+  const { station } = await searchParams;
 
   await runClaimVestingBatch(user.id);
 
@@ -87,7 +92,7 @@ export default async function EarnMinePage() {
           schedules={schedules}
         />
 
-        <PetrolReceiptForm />
+        <PetrolReceiptForm defaultStation={station} />
         <MetaAdsOnboardingForm adsDepositRate={config.adsDepositRate} />
 
         <div>
