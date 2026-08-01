@@ -7,6 +7,7 @@ import { getPrisma } from "@/lib/prisma";
 import { createSession, deleteSession } from "@/lib/session";
 import { EMAIL_PATTERN, getClientIpFromHeaders, isRateLimited, stripControlChars } from "@/lib/apiSecurity";
 import { generateUniqueReferralCode } from "@/lib/referral";
+import { getGrandMasterId } from "@/lib/grandMaster";
 
 export type AuthFormState = { error?: string } | undefined;
 
@@ -42,6 +43,9 @@ export async function registerUser(_prevState: AuthFormState, formData: FormData
 
   const refCodeRaw = String(formData.get("ref") ?? "").trim().toUpperCase();
   const referrer = refCodeRaw ? await prisma.user.findUnique({ where: { referralCode: refCodeRaw } }) : null;
+  // Every account is bound under a real referrer or, failing that, the
+  // Grand Master 001 placeholder — referredById is never left null.
+  const referredById = referrer?.id ?? (await getGrandMasterId());
 
   const user = await prisma.user.create({
     data: {
@@ -51,7 +55,7 @@ export async function registerUser(_prevState: AuthFormState, formData: FormData
       passwordHash,
       referralCode,
       role: "USER",
-      referredById: referrer?.id,
+      referredById,
     },
   });
 

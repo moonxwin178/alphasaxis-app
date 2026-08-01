@@ -58,7 +58,7 @@ export interface SessionUser {
   id: string;
   email: string;
   name: string;
-  role: "USER" | "AGENT" | "AGENCY" | "ADMIN";
+  role: "USER" | "AGENT" | "AGENCY" | "LOAN_CONSULTANT" | "ADMIN";
 }
 
 /** Verifies the session cookie against the database. Returns null if absent/expired/revoked. */

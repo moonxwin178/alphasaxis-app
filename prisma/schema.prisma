@@ -15,6 +15,7 @@ enum Role {
   USER
   AGENT
   AGENCY
+  LOAN_CONSULTANT
   ADMIN
 }
 
@@ -179,6 +180,8 @@ model User {
   ownedAgency     Agency?              @relation("AgencyOwner")
   agencyAgentRows AgencyAgent[]        @relation("AgencyAgentUser")
   applicantCases  Case[]               @relation("CaseApplicant")
+  consultantCases Case[]               @relation("CaseConsultant")
+  commissionLineItems CommissionLineItem[]
   caseEvents      CaseEvent[]
   documents       Document[]           @relation("DocumentUploader")
   reviewedDocs    Document[]           @relation("DocumentReviewer")
@@ -296,16 +299,45 @@ model Case {
   financingType FinancingType
   amount        Decimal       @db.Decimal(14, 2)
   status        CaseStatus    @default(SUBMITTED)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
 
-  events      CaseEvent[]
-  documents   Document[]
-  commissions Commission[]
+  // Commission-distribution fields. introducerTier is snapshotted the
+  // moment an agent is assigned, so a later NFT upgrade can't retroactively
+  // change an already-submitted deal's split (matches the confirmed rule:
+  // "unless they mint before submission").
+  introducerTier BrokerageTier?
+  servicingMode  ServicingMode  @default(UNDECIDED)
+  consultantId   String?
+  consultant     User?          @relation("CaseConsultant", fields: [consultantId], references: [id])
+  grossCommission Decimal?      @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events            CaseEvent[]
+  documents         Document[]
+  commissions       Commission[]
+  commissionLines   CommissionLineItem[]
+  treasuryEntries   TreasuryLedgerEntry[]
 
   @@index([applicantId])
   @@index([agentId])
+  @@index([consultantId])
   @@index([status])
+}
+
+enum BrokerageTier {
+  AXIS_ZERO
+  AXIS_ONE
+  AXIS_PRO
+}
+
+// UNDECIDED until admin/agent settle whether the introducer self-services
+// the case or needs an internal Loan Consultant — this directly drives the
+// commission engine's isSelfClosed calculation, not just a workflow label.
+enum ServicingMode {
+  UNDECIDED
+  SELF_SERVICED
+  NEEDS_CONSULTANT
 }
 
 model CaseEvent {
@@ -413,6 +445,51 @@ model Commission {
   status       CommissionStatus  @default(PENDING)
   approvedById String?
   computedAt   DateTime          @default(now())
+
+  @@index([caseId])
+}
+
+enum CommissionLineRole {
+  AES
+  TREASURY
+  LEAD_PROVIDER
+  CALLER
+  CLOSER
+  OVERRIDE_INTRODUCER
+  OVERRIDE_UPLINE
+  OVERRIDE_PLATFORM
+  OVERRIDE_CONSULTANT
+}
+
+// One row per party per disbursed case — the output of
+// computeCommissionDistribution() (see src/lib/commissionEngine.ts),
+// persisted. recipientId is null for house lines (AES, Treasury, platform).
+model CommissionLineItem {
+  id           String             @id @default(cuid())
+  caseId       String
+  case         Case               @relation(fields: [caseId], references: [id])
+  role         CommissionLineRole
+  recipientId  String?
+  recipient    User?              @relation(fields: [recipientId], references: [id])
+  amount       Decimal            @db.Decimal(14, 2)
+  status       CommissionStatus   @default(PENDING)
+  approvedById String?
+  computedAt   DateTime           @default(now())
+
+  @@index([caseId])
+  @@index([recipientId])
+}
+
+// Running ledger of the tier-gap (the difference between a lower tier's
+// team share and AxisPro's "top" 70%) banked out of every case, per the
+// confirmed rule. Recorded in fiat terms only — converting any of this to
+// BTC/ETH/BNB/PLS is a real trade a human executes, never automated here.
+model TreasuryLedgerEntry {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  amount    Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
 
   @@index([caseId])
 }
