@@ -11,10 +11,12 @@ import { sendNotificationEmail } from "@/lib/email";
 import { generateUniqueReferralCode } from "@/lib/referral";
 import { createConsultantInviteToken } from "@/lib/inviteToken";
 import { EMAIL_PATTERN, stripControlChars } from "@/lib/apiSecurity";
-import { getEmissionSnapshot, type MiningTier } from "@/lib/axisEmission";
+import { getMiningConfig, rmToAxis } from "@/lib/miningConfig";
 import { createNodeVesting, runVestingBatch } from "@/lib/axisPrestigeVesting";
 import { contributeToPrestigePool, runRevenueDistribution } from "@/lib/axisPrestigeRevenue";
 import { contributeNodeSaleShare } from "@/lib/liquidityReserve";
+import { contributeAesRevenue, runAesNodePoolDistribution } from "@/lib/aesRevenue";
+import type { AesRevenueTarget } from "@/generated/prisma/client";
 import type { AxisRealizedValueSource } from "@/generated/prisma/client";
 
 export type AdminFormState = { error?: string } | undefined;
@@ -268,11 +270,14 @@ export async function resolveDispute(disputeId: string, note: string): Promise<A
  * capped, never rejected outright, so admins don't need to pre-calculate
  * the exact cap themselves.
  */
-export async function reviewMiningSubmission(
-  submissionId: string,
-  action: "approve" | "reject",
-  requestedAmount?: number
-): Promise<AdminFormState> {
+/**
+ * Approval deposits the submission's RM value into the user's personal
+ * mining pool (the deposit-quota check already ran at submission time) —
+ * it doesn't award $AXIS directly. The user only mines it out by completing
+ * tasks, subject to the tier + Mining Power Multiplier weighted cap. See
+ * src/lib/miningPool.ts.
+ */
+export async function reviewMiningSubmission(submissionId: string, action: "approve" | "reject"): Promise<AdminFormState> {
   const admin = await requireRole("ADMIN");
   const prisma = getPrisma();
 
@@ -291,35 +296,19 @@ export async function reviewMiningSubmission(
     return undefined;
   }
 
-  const tier = (await resolveBrokerageTier(submission.userId)) as MiningTier;
-  const snapshot = await getEmissionSnapshot();
-  if (!snapshot) return { error: "Emission pool is not configured." };
+  const depositValueRm = Number(submission.depositValueRm ?? 0);
+  if (depositValueRm <= 0) return { error: "This submission has no deposit value recorded." };
 
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-
-  const awardedThisMonthAgg = await prisma.axisVestingLedgerEntry.aggregate({
-    where: { userId: submission.userId, source: "AGENT2MINE_TASK", createdAt: { gte: monthStart } },
-    _sum: { delta: true },
-  });
-  const alreadyAwarded = Number(awardedThisMonthAgg._sum.delta ?? 0);
-  const remainingCap = Math.max(0, snapshot.capByTier[tier] - alreadyAwarded);
-
-  if (remainingCap <= 0) {
-    return { error: "This user has already reached their Agent2Mine cap for this month." };
-  }
-
-  const proposed = requestedAmount && requestedAmount > 0 ? requestedAmount : remainingCap;
-  const finalAmount = Math.min(proposed, remainingCap);
+  const config = await getMiningConfig();
+  const axisDeposited = rmToAxis(depositValueRm, config.fxRateRmPerUsd);
 
   await prisma.$transaction([
     prisma.axisMiningSubmission.update({
       where: { id: submissionId },
-      data: { status: "APPROVED", axisAwarded: finalAmount, reviewedById: admin.id, reviewedAt: new Date() },
+      data: { status: "APPROVED", axisDeposited, reviewedById: admin.id, reviewedAt: new Date() },
     }),
-    prisma.axisVestingLedgerEntry.create({
-      data: { userId: submission.userId, delta: finalAmount, source: "AGENT2MINE_TASK", refId: submissionId },
+    prisma.miningPoolLedgerEntry.create({
+      data: { userId: submission.userId, delta: axisDeposited, source: "DEPOSIT", refId: submissionId },
     }),
   ]);
 
@@ -339,7 +328,20 @@ export async function reviewMiningSubmission(
  * via submitNodeVerification (actions/nft.ts). Approval is what starts the
  * clock — it creates the node's vesting record (cliff begins now).
  */
-export async function reviewNodeVerification(nftHoldingId: string, approve: boolean): Promise<AdminFormState> {
+/**
+ * approvedNodeCount lets the admin verify/adjust the self-declared count
+ * against what they can actually see on-chain (turbox.bond or a block
+ * explorer — no live blockchain integration exists to read it
+ * automatically) before approving. Multiple nodes create one NftHolding +
+ * one AxisPrestigeNodeVesting row each (the vesting model requires a
+ * unique nftHoldingId), all VERIFIED, same wallet — the 3x multiplier
+ * stays flat per person regardless of how many.
+ */
+export async function reviewNodeVerification(
+  nftHoldingId: string,
+  approve: boolean,
+  approvedNodeCount?: number
+): Promise<AdminFormState> {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
@@ -353,12 +355,28 @@ export async function reviewNodeVerification(nftHoldingId: string, approve: bool
     return undefined;
   }
 
+  const nodeCount = Math.max(1, Math.floor(approvedNodeCount ?? holding.claimedNodeCount ?? 1));
   const verifiedAt = new Date();
+
   await prisma.nftHolding.update({
     where: { id: nftHoldingId },
-    data: { verificationStatus: "VERIFIED", chain: "verified-manual" },
+    data: { verificationStatus: "VERIFIED", chain: "verified-manual", claimedNodeCount: nodeCount },
   });
   await createNodeVesting(nftHoldingId, holding.userId, verifiedAt);
+
+  for (let i = 1; i < nodeCount; i++) {
+    const extraHolding = await prisma.nftHolding.create({
+      data: {
+        userId: holding.userId,
+        tier: "AXIS_PRESTIGE",
+        multiplier: holding.multiplier,
+        chain: "verified-manual",
+        walletAddress: holding.walletAddress,
+        verificationStatus: "VERIFIED",
+      },
+    });
+    await createNodeVesting(extraHolding.id, holding.userId, verifiedAt);
+  }
 
   revalidatePath("/admin/axisprestige");
   revalidatePath("/profile");
@@ -488,6 +506,36 @@ export async function logNodeSaleLiquidityContribution(amountUsd: number, note: 
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) return { error: "Enter a valid amount." };
 
   await contributeNodeSaleShare(amountUsd, stripControlChars(note).slice(0, 200) || "Node sale liquidity contribution", admin.id);
+
+  revalidatePath("/admin/axisprestige");
+  return undefined;
+}
+
+/**
+ * Logs a real AES net-revenue figure (the broader business, not just the
+ * commission-engine's AES line item) and auto-computes all six target
+ * splits: 1%/1%/1% to the three node pools, 3.5%/2.1%/1.4% to
+ * buyback-burn/strategic-reserve/operations.
+ */
+export async function logAesRevenueContribution(aesNetRevenueUsd: number, note: string): Promise<AdminFormState> {
+  const admin = await requireRole("ADMIN");
+  if (!Number.isFinite(aesNetRevenueUsd) || aesNetRevenueUsd <= 0) return { error: "Enter a valid revenue figure." };
+
+  await contributeAesRevenue(aesNetRevenueUsd, stripControlChars(note).slice(0, 200) || "AES revenue contribution", admin.id);
+
+  revalidatePath("/admin/axisprestige");
+  return undefined;
+}
+
+/** Distributes a node pool's accumulated balance to qualifying node holders (1+/5+/10+ nodes for Pool A/B/C). */
+export async function runAesPoolDistribution(target: AesRevenueTarget): Promise<AdminFormState> {
+  const admin = await requireRole("ADMIN");
+  if (target !== "NODE_POOL_A" && target !== "NODE_POOL_B" && target !== "NODE_POOL_C") {
+    return { error: "Invalid pool." };
+  }
+
+  const result = await runAesNodePoolDistribution(target, admin.id);
+  if ("error" in result) return { error: result.error };
 
   revalidatePath("/admin/axisprestige");
   return undefined;

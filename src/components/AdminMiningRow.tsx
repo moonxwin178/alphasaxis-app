@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition, useState } from "react";
 import { reviewMiningSubmission } from "@/app/actions/admin";
 
 export function AdminMiningRow({
   submissionId,
   title,
   sub,
-  suggestedAmount,
+  depositValueRm,
 }: {
   submissionId: string;
   title: string;
   sub: string;
-  suggestedAmount: number;
+  depositValueRm: number;
 }) {
-  const [amount, setAmount] = useState(String(suggestedAmount.toFixed(2)));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | undefined>();
   const [done, setDone] = useState<"approved" | "rejected" | undefined>();
@@ -41,14 +40,7 @@ export function AdminMiningRow({
         </div>
       </div>
       <div className="mt-[-4px] flex flex-col gap-2">
-        <input
-          type="number"
-          step="0.0001"
-          min="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="rounded-[10px] border border-[var(--gold-border)] bg-[var(--card2)] px-3 py-2 text-[12px] font-semibold text-white"
-        />
+        <p className="p-note !mb-0">Approving deposits RM {depositValueRm.toLocaleString()} worth of $AXIS into their mining pool.</p>
         {error && <p className="p-note text-[var(--red)]">{error}</p>}
         <div className="grid2">
           <button
@@ -57,7 +49,7 @@ export function AdminMiningRow({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                const result = await reviewMiningSubmission(submissionId, "approve", Number(amount));
+                const result = await reviewMiningSubmission(submissionId, "approve");
                 if (result?.error) setError(result.error);
                 else setDone("approved");
               })

@@ -5,12 +5,20 @@ import { submitPetrolReceipt } from "@/app/actions/mining";
 
 const MERCHANTS = ["Petron", "Petronas", "Shell"] as const;
 
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function PetrolReceiptForm() {
   const [state, action, pending] = useActionState(submitPetrolReceipt, undefined);
 
   return (
     <form action={action} className="card">
       <p className="row-title mb-2">Petrol subsidy receipt</p>
+      <p className="p-note mb-2">
+        Only receipts from this calendar month are eligible — the government subsidy portion is calculated
+        automatically from your total spend.
+      </p>
       <div className="field">
         <label htmlFor="merchantName">Station</label>
         <select id="merchantName" name="merchantName" required defaultValue="">
@@ -29,8 +37,12 @@ export function PetrolReceiptForm() {
         <input id="receiptNumber" name="receiptNumber" type="text" required maxLength={60} />
       </div>
       <div className="field">
-        <label htmlFor="subsidyAmountRm">Government subsidy amount shown (RM)</label>
-        <input id="subsidyAmountRm" name="subsidyAmountRm" type="number" step="0.01" min="0" required />
+        <label htmlFor="spendDate">Date on receipt</label>
+        <input id="spendDate" name="spendDate" type="date" required max={todayIso()} defaultValue={todayIso()} />
+      </div>
+      <div className="field">
+        <label htmlFor="spendAmountRm">Total petrol spend (RM)</label>
+        <input id="spendAmountRm" name="spendAmountRm" type="number" step="0.01" min="0" required />
       </div>
       <div className="field">
         <label htmlFor="receipt">Receipt photo</label>

@@ -7,6 +7,9 @@ import { uploadPrivateFile } from "@/lib/blob";
 import { computePerceptualHash, checkDuplicateReceipt } from "@/lib/receiptFraud";
 import { stripControlChars } from "@/lib/apiSecurity";
 import { isCountryAllowedForMining, ALLOWED_MINING_COUNTRIES } from "@/lib/regionGate";
+import { checkDepositQuota } from "@/lib/miningPool";
+import { getMiningConfig } from "@/lib/miningConfig";
+import { ADS_DEPOSIT_RATE } from "@/lib/miningQuota";
 
 export type MiningFormState = { error?: string; ok?: boolean } | undefined;
 
@@ -15,11 +18,17 @@ const PETROL_MERCHANTS = ["Petron", "Petronas", "Shell"] as const;
 
 const REGION_ERROR = `Currently open to ${ALLOWED_MINING_COUNTRIES.join(", ")} residents only — more of Southeast Asia is opening up soon as AlphasAxis expands.`;
 
+/** "2026-08" for the given date, used to enforce same-calendar-month-only receipt validity. */
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /**
- * Spend-to-Earn: government RON95/diesel subsidy receipts. Gated on both
- * KYC VERIFIED status and nationality — Malaysia only at launch, per the
- * confirmed rule that Spend-to-Earn/Submit-to-Earn tasks are region-gated
- * while Network-to-Earn/Social-to-Earn stay global (see regionGate.ts).
+ * Spend-to-Earn: government RON95/diesel subsidy receipts. Approval now
+ * deposits the subsidy value into the user's personal mining pool (see
+ * miningPool.ts) rather than awarding $AXIS directly — it only becomes
+ * spendable by completing tasks. Gated on KYC, nationality, the
+ * same-calendar-month rule, and the tier-scaled weekly/monthly RM quota.
  */
 export async function submitPetrolReceipt(
   _prevState: MiningFormState,
@@ -39,7 +48,9 @@ export async function submitPetrolReceipt(
   const file = formData.get("receipt");
   const merchantName = stripControlChars(String(formData.get("merchantName") ?? ""));
   const receiptNumber = stripControlChars(String(formData.get("receiptNumber") ?? "")).slice(0, 60);
-  const subsidyAmountRm = Number(formData.get("subsidyAmountRm"));
+  const spendAmountRm = Number(formData.get("spendAmountRm"));
+  const spendDateRaw = String(formData.get("spendDate") ?? "");
+  const spendDate = spendDateRaw ? new Date(spendDateRaw) : null;
 
   if (!(file instanceof File) || file.size === 0) return { error: "Please attach a receipt photo." };
   if (file.size > MAX_BYTES) return { error: "File is too large (max 10MB)." };
@@ -47,9 +58,23 @@ export async function submitPetrolReceipt(
     return { error: "Select which station this receipt is from." };
   }
   if (!receiptNumber) return { error: "Enter the receipt/invoice number." };
-  if (!Number.isFinite(subsidyAmountRm) || subsidyAmountRm <= 0) {
-    return { error: "Enter the government subsidy amount shown on the receipt." };
+  if (!Number.isFinite(spendAmountRm) || spendAmountRm <= 0) {
+    return { error: "Enter how much you spent on petrol (RM)." };
   }
+  if (!spendDate || Number.isNaN(spendDate.getTime())) {
+    return { error: "Enter the date shown on the receipt." };
+  }
+
+  const now = new Date();
+  if (monthKey(spendDate) !== monthKey(now)) {
+    return { error: "This receipt isn't from this calendar month — only same-month spend is eligible." };
+  }
+
+  const config = await getMiningConfig();
+  const subsidyAmountRm = Math.round(spendAmountRm * config.petrolSubsidyRate * 100) / 100;
+
+  const quota = await checkDepositQuota(user.id, "PETROL_RECEIPT", subsidyAmountRm, now);
+  if (!quota.ok) return { error: quota.error };
 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
@@ -67,6 +92,8 @@ export async function submitPetrolReceipt(
       merchantName,
       receiptNumber,
       subsidyAmountRm,
+      depositValueRm: subsidyAmountRm,
+      spendDate,
       perceptualHash,
       duplicateOfId: duplicate.matchedSubmissionId,
       rejectionReason: duplicate.isDuplicate ? duplicate.reason : null,
@@ -80,11 +107,10 @@ export async function submitPetrolReceipt(
 }
 
 /**
- * Spend-to-Earn: Meta Ads spend onboarding. Tiered — property/loan-financing
- * lead-gen ads specifically earn a higher reward than general ad spend, per
- * the confirmed rule. No Meta Ads API integration (needs a Meta business
- * registration we don't have) — the screenshot is manually verified by an
- * admin against the reported spend, same "pending manual review" pattern.
+ * Spend-to-Earn: Meta Ads spend onboarding. Deposit value = 10% of verified
+ * ad spend, same deposit-pool mechanics as petrol receipts. No Meta Ads API
+ * integration — the screenshot is manually verified by an admin against
+ * the reported spend, same "pending manual review" pattern.
  */
 export async function submitMetaAdsOnboarding(
   _prevState: MiningFormState,
@@ -103,14 +129,28 @@ export async function submitMetaAdsOnboarding(
 
   const file = formData.get("proof");
   const category = String(formData.get("category") ?? "");
-  const spendUsd = Number(formData.get("spendUsd"));
+  const spendRm = Number(formData.get("spendRm"));
+  const spendDateRaw = String(formData.get("spendDate") ?? "");
+  const spendDate = spendDateRaw ? new Date(spendDateRaw) : null;
 
   if (!(file instanceof File) || file.size === 0) return { error: "Please attach a screenshot of your ad spend." };
   if (file.size > MAX_BYTES) return { error: "File is too large (max 10MB)." };
   if (category !== "PROPERTY_LOAN_LEADGEN" && category !== "GENERAL") {
     return { error: "Select an ad category." };
   }
-  if (!Number.isFinite(spendUsd) || spendUsd <= 0) return { error: "Enter your ad spend in USD." };
+  if (!Number.isFinite(spendRm) || spendRm <= 0) return { error: "Enter your ad spend (RM)." };
+  if (!spendDate || Number.isNaN(spendDate.getTime())) {
+    return { error: "Enter the date of this ad spend." };
+  }
+
+  const now = new Date();
+  if (monthKey(spendDate) !== monthKey(now)) {
+    return { error: "This spend isn't from this calendar month — only same-month spend is eligible." };
+  }
+
+  const depositValueRm = Math.round(spendRm * ADS_DEPOSIT_RATE * 100) / 100;
+  const quota = await checkDepositQuota(user.id, "META_ADS_ONBOARDING", depositValueRm, now);
+  if (!quota.ok) return { error: quota.error };
 
   const arrayBuffer = await file.arrayBuffer();
   const blobPath = await uploadPrivateFile(`mining/${user.id}`, file.name, arrayBuffer);
@@ -122,7 +162,9 @@ export async function submitMetaAdsOnboarding(
       status: "PENDING",
       blobPath,
       metaAdsCategory: category,
-      metaAdsSpendUsd: spendUsd,
+      adSpendRm: spendRm,
+      depositValueRm,
+      spendDate,
     },
   });
 

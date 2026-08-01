@@ -29,6 +29,27 @@ export async function setKycNationality(nationality: string): Promise<KycFormSta
   return undefined;
 }
 
+/**
+ * Sybil resistance — a unique NRIC/passport number, enforced with a DB
+ * uniqueness constraint. One real identity, one account: every per-account
+ * Agent2Mine cap and referral reward means nothing if this isn't in place.
+ */
+export async function setKycIdentityNumber(identityNumber: string): Promise<KycFormState> {
+  const user = await requireUser();
+  const clean = identityNumber.trim().replace(/\s+/g, "").toUpperCase().slice(0, 30);
+  if (clean.length < 5) return { error: "Enter your NRIC or passport number." };
+
+  const prisma = getPrisma();
+  const existing = await prisma.kycSubmission.findUnique({ where: { identityNumber: clean } });
+  const submission = await ensureSubmission(user.id);
+  if (existing && existing.id !== submission.id) {
+    return { error: "This identity number is already registered to another account." };
+  }
+
+  await prisma.kycSubmission.update({ where: { id: submission.id }, data: { identityNumber: clean } });
+  return undefined;
+}
+
 export async function uploadKycDocument(
   _prevState: KycFormState,
   formData: FormData
@@ -89,6 +110,9 @@ export async function submitKycForReview(_formData: FormData): Promise<KycFormSt
 
   if (!submission || submission.documents.length < DOC_TYPES.length) {
     return { error: "Please upload all 3 documents before submitting." };
+  }
+  if (!submission.identityNumber) {
+    return { error: "Please enter your NRIC/passport number before submitting." };
   }
 
   await prisma.kycSubmission.update({

@@ -15,6 +15,10 @@ const CATEGORIES = [
 
 type ConnectState = "idle" | "connecting" | "not-available";
 
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function MetaAdsOnboardingForm() {
   const [state, action, pending] = useActionState(submitMetaAdsOnboarding, undefined);
   const [connect, setConnect] = useState<ConnectState>("idle");
@@ -73,8 +77,13 @@ export function MetaAdsOnboardingForm() {
         </div>
 
         <div className="field">
-          <label htmlFor="spendUsd">Ad spend (USD)</label>
-          <input id="spendUsd" name="spendUsd" type="number" step="0.01" min="0" required />
+          <label htmlFor="spendDate">Date of this spend</label>
+          <input id="spendDate" name="spendDate" type="date" required max={todayIso()} defaultValue={todayIso()} />
+        </div>
+        <div className="field">
+          <label htmlFor="spendRm">Ad spend (RM)</label>
+          <input id="spendRm" name="spendRm" type="number" step="0.01" min="0" required />
+          <p className="p-note !mb-0">10% of this deposits into your mining pool.</p>
         </div>
         <div className="field">
           <label htmlFor="proof">Screenshot of Meta Ads Manager spend</label>

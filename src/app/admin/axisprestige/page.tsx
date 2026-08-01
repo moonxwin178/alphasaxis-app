@@ -9,12 +9,14 @@ import { getPrestigePoolBalance, getVerifiedPrestigeNodes } from "@/lib/axisPres
 import { computeVestedTokens, getRealizedValueTotal, EARLY_BACKERS_POOL_TOKENS } from "@/lib/axisPrestigeVesting";
 import { getLiquidityReserveBalance } from "@/lib/liquidityReserve";
 import { LiquidityReservePanel } from "@/components/LiquidityReservePanel";
+import { getAesTargetBalance } from "@/lib/aesRevenue";
+import { AesRevenuePanel } from "@/components/AesRevenuePanel";
 
 export default async function AdminAxisPrestigePage() {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
-  const [pendingClaims, poolBalance, verifiedNodes, nodeVestings, liquidityBalance] = await Promise.all([
+  const [pendingClaims, poolBalance, verifiedNodes, nodeVestings, liquidityBalance, aesBalances] = await Promise.all([
     prisma.nftHolding.findMany({
       where: { tier: "AXIS_PRESTIGE", verificationStatus: "PENDING" },
       include: { user: { select: { name: true } } },
@@ -27,6 +29,21 @@ export default async function AdminAxisPrestigePage() {
       orderBy: { createdAt: "desc" },
     }),
     getLiquidityReserveBalance(),
+    Promise.all([
+      getAesTargetBalance("NODE_POOL_A"),
+      getAesTargetBalance("NODE_POOL_B"),
+      getAesTargetBalance("NODE_POOL_C"),
+      getAesTargetBalance("BUYBACK_BURN"),
+      getAesTargetBalance("STRATEGIC_RESERVE"),
+      getAesTargetBalance("OPERATIONS"),
+    ]).then(([NODE_POOL_A, NODE_POOL_B, NODE_POOL_C, BUYBACK_BURN, STRATEGIC_RESERVE, OPERATIONS]) => ({
+      NODE_POOL_A,
+      NODE_POOL_B,
+      NODE_POOL_C,
+      BUYBACK_BURN,
+      STRATEGIC_RESERVE,
+      OPERATIONS,
+    })),
   ]);
 
   const now = new Date();
@@ -57,13 +74,22 @@ export default async function AdminAxisPrestigePage() {
           <>
             <p className="eyebrow">Pending node claims</p>
             {pendingClaims.map((c) => (
-              <AdminNodeClaimRow key={c.id} nftHoldingId={c.id} name={c.user.name} walletAddress={c.walletAddress} />
+              <AdminNodeClaimRow
+                key={c.id}
+                nftHoldingId={c.id}
+                name={c.user.name}
+                walletAddress={c.walletAddress}
+                claimedNodeCount={c.claimedNodeCount ?? 1}
+              />
             ))}
           </>
         )}
 
         <p className="eyebrow mt-2">Liquidity</p>
         <LiquidityReservePanel balance={liquidityBalance} />
+
+        <p className="eyebrow mt-2">AES revenue share</p>
+        <AesRevenuePanel balances={aesBalances} />
 
         <p className="eyebrow mt-2">Revenue share (USD/USDT)</p>
         <AxisPrestigePoolPanel poolBalance={poolBalance} nodeCount={verifiedNodes.length} />

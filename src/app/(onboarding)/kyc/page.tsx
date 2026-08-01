@@ -3,6 +3,7 @@ import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { KycDocRow } from "@/components/KycDocRow";
 import { NationalitySelect } from "@/components/NationalitySelect";
+import { IdentityNumberField } from "@/components/IdentityNumberField";
 import { submitKycForReview } from "@/app/actions/kyc";
 
 export default async function KycPage() {
@@ -19,6 +20,8 @@ export default async function KycPage() {
 
   const uploadedCount = submission?.documents.length ?? 0;
   const allUploaded = uploadedCount >= 3;
+  const hasIdentityNumber = !!submission?.identityNumber;
+  const canSubmit = allUploaded && hasIdentityNumber;
   const alreadySubmitted = submission?.status === "PENDING" || submission?.status === "VERIFIED";
 
   return (
@@ -32,6 +35,7 @@ export default async function KycPage() {
         <p className="p-note mt-1">{uploadedCount} of 3 documents uploaded</p>
 
         <NationalitySelect initialValue={submission?.nationality ?? null} />
+        <IdentityNumberField initialValue={submission?.identityNumber ?? null} />
 
         <KycDocRow
           docType="NRIC_PASSPORT"
@@ -65,7 +69,7 @@ export default async function KycPage() {
               await submitKycForReview(formData);
             }}
           >
-            <button className="btn primary mt-3" type="submit" disabled={!allUploaded}>
+            <button className="btn primary mt-3" type="submit" disabled={!canSubmit}>
               Submit for Verification
             </button>
           </form>

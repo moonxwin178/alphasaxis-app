@@ -2,6 +2,8 @@ import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { CheckInButton } from "@/components/CheckInButton";
+import { SocialTaskRow } from "@/components/SocialTaskRow";
+import { getSocialTaskStatus } from "@/app/actions/earn";
 
 export default async function EarnSocialPage() {
   const user = await requireRole("USER");
@@ -10,9 +12,10 @@ export default async function EarnSocialPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [todayCheckIn, recent] = await Promise.all([
+  const [todayCheckIn, recent, socialTasks] = await Promise.all([
     prisma.checkIn.findUnique({ where: { userId_date: { userId: user.id, date: today } } }),
     prisma.checkIn.findMany({ where: { userId: user.id }, orderBy: { date: "desc" }, take: 7 }),
+    getSocialTaskStatus(user.id),
   ]);
 
   const streak = todayCheckIn?.streakCount ?? recent[0]?.streakCount ?? 0;
@@ -57,6 +60,11 @@ export default async function EarnSocialPage() {
           </div>
           <CheckInButton alreadyCheckedIn={!!todayCheckIn} />
         </div>
+
+        <p className="eyebrow mt-4">Follow & join</p>
+        {socialTasks.map((t) => (
+          <SocialTaskRow key={t.key} taskKey={t.key} label={t.label} points={t.points} href={t.href} claimed={t.claimed} />
+        ))}
       </div>
     </div>
   );

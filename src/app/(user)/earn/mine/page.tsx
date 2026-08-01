@@ -4,6 +4,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { PetrolReceiptForm } from "@/components/PetrolReceiptForm";
 import { MetaAdsOnboardingForm } from "@/components/MetaAdsOnboardingForm";
 import { getAxisVestingBalance } from "@/lib/axisEmission";
+import { getMiningPoolBalance } from "@/lib/miningPool";
+import { getMiningPowerMultiplier } from "@/lib/miningPowerMultiplier";
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: '<span class="badge amber">Review</span>',
@@ -21,8 +23,10 @@ export default async function EarnMinePage() {
   const user = await requireRole("USER");
   const prisma = getPrisma();
 
-  const [balance, submissions] = await Promise.all([
+  const [minedBalance, poolBalance, mpm, submissions] = await Promise.all([
     getAxisVestingBalance(user.id, "AGENT2MINE_TASK"),
+    getMiningPoolBalance(user.id),
+    getMiningPowerMultiplier(user.id),
     prisma.axisMiningSubmission.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
   ]);
 
@@ -30,12 +34,21 @@ export default async function EarnMinePage() {
     <div>
       <AppHeader title="Agent2Mine" backHref="/earn" />
       <div className="flex flex-col gap-4 px-4 pt-4">
-        <div className="card !mb-0 p-5 text-center">
-          <p className="eyebrow">$AXIS earned (Agent2Mine)</p>
-          <p className="my-1 text-[28px] font-extrabold text-white">{balance.toLocaleString()}</p>
+        <div className="stat-grid !mb-0">
+          <div className="stat">
+            <div className="label">$AXIS mined</div>
+            <div className="value">{minedBalance.toLocaleString()}</div>
+          </div>
+          <div className="stat">
+            <div className="label">Waiting to be mined</div>
+            <div className="value">{poolBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+          </div>
+        </div>
+        <div className="card !mb-0">
           <p className="p-note !mb-0">
-            Separate from your points balance above — real $AXIS mined from Spend-to-Earn tasks, subject to
-            a monthly per-tier cap. Distribution to an on-chain wallet is not live yet.
+            Petrol receipts and ad spend deposit real value into your pool above — a permanent claim, no expiry.
+            Complete tasks (check-ins, submit-to-earn, social) to mine it out, up to your tier&apos;s weekly/monthly/
+            yearly cap. Your Mining Power Multiplier from active referrals: <b>{mpm.toFixed(2)}x</b>.
           </p>
         </div>
 
@@ -57,7 +70,7 @@ export default async function EarnMinePage() {
                 <p className="row-title">{TASK_LABEL[s.taskType]}</p>
                 <p className="row-sub">
                   {new Date(s.createdAt).toLocaleDateString()}
-                  {s.axisAwarded ? ` · +${Number(s.axisAwarded).toLocaleString()} $AXIS` : ""}
+                  {s.depositValueRm ? ` · RM${Number(s.depositValueRm).toLocaleString()} deposit value` : ""}
                 </p>
               </div>
               <div className="row-right" dangerouslySetInnerHTML={{ __html: STATUS_BADGE[s.status] }} />

@@ -127,6 +127,7 @@ enum WalletReason {
   AGENCY_MEMBERSHIP_REFUND
   ADMIN_ADJUST
   AXISPRESTIGE_REVENUE_SHARE
+  AES_NODE_POOL_SHARE
 }
 
 enum AgencyAgentStatus {
@@ -207,6 +208,8 @@ model User {
   axisPrestigeVestingLines  AxisPrestigeVestingRunLine[]
   axisPrestigeNodeVestings  AxisPrestigeNodeVesting[]
   axisRealizedValueEntries  AxisRealizedValueEntry[]
+  miningPoolLedger          MiningPoolLedgerEntry[]
+  aesNodePoolLines          AesNodePoolDistributionLine[]
 
   @@index([role])
 }
@@ -271,6 +274,12 @@ model KycSubmission {
   // Network-to-Earn/Social-to-Earn stay unrestricted since $AXIS itself is
   // on-chain and not country-bound.
   nationality    String?
+  // Unique real-world identity number (NRIC/passport) — Sybil resistance.
+  // One real identity, one account: nothing else in this app (per-account
+  // Agent2Mine caps, referral rewards, etc.) means anything if one person
+  // can register multiple accounts, so this is enforced with a DB-level
+  // uniqueness constraint, not just a document photo review.
+  identityNumber String?       @unique
   reviewedById   String?
   reviewer       User?         @relation("KycReviewer", fields: [reviewedById], references: [id])
   reviewedAt     DateTime?
@@ -301,6 +310,15 @@ model NftHolding {
   walletAddress       String? // set for AxisPrestige node claims, verified against app.turbox.bond/node-pad
   verificationStatus  NftVerificationStatus  @default(VERIFIED) // node claims start PENDING until an admin confirms on-chain ownership
   mintedAt            DateTime               @default(now())
+
+  // AxisPrestige only: how many nodes this specific wallet actually holds.
+  // Multiple nodes per person are allowed and each gets its own
+  // AxisPrestigeNodeVesting row (no multiplier stacking — just more
+  // allocation), but they don't get a separate NftHolding row each; this
+  // count is what admin verifies against the real on-chain wallet (no
+  // blockchain integration yet, so this is a manual check, same as
+  // everything else not yet wired to real chain data) before approval.
+  claimedNodeCount    Int?
 
   @@index([userId])
 }
@@ -688,6 +706,18 @@ model AxisMiningSubmission {
   // META_ADS_ONBOARDING fields
   metaAdsCategory MetaAdsCategory?
   metaAdsSpendUsd Decimal?           @db.Decimal(10, 2)
+  adSpendRm       Decimal?           @db.Decimal(10, 2)
+
+  // Deposit mechanics (v2): approval no longer awards $AXIS directly — it
+  // deposits depositValueRm (the subsidy amount for petrol, 10% of spend
+  // for ads) into the user's personal MiningPoolLedgerEntry backlog, which
+  // only becomes spendable $AXIS by completing tasks (see
+  // src/lib/miningPool.ts). spendDate is the date shown on the
+  // receipt/invoice — deposits are only valid for spend within the same
+  // calendar month as submission, enforced against this field.
+  spendDate       DateTime?
+  depositValueRm  Decimal?           @db.Decimal(10, 2)
+  axisDeposited   Decimal?           @db.Decimal(18, 4)
 
   axisAwarded     Decimal?           @db.Decimal(18, 4)
   duplicateOfId   String?
@@ -854,5 +884,102 @@ model AxisRealizedValueEntry {
   note      String?
   createdAt DateTime                @default(now())
 
+  @@index([userId])
+}
+
+// ============================================================================
+// Agent2Mine v2 — deposit pool + task-gated mine-out, per the confirmed
+// design: Spend-to-Earn (petrol subsidy, ads spend) deposits real-world
+// verified value into a personal backlog pool (RM-quota gated, same-
+// calendar-month only, no rollover on exceeded quota), which only becomes
+// spendable $AXIS by completing tasks — the withdrawal rate is a performance
+// KPI (task volume), the ceiling is tier + Mining Power Multiplier weighted.
+// See src/lib/miningPool.ts.
+// ============================================================================
+
+enum MiningPoolEntrySource {
+  DEPOSIT      // petrol/ads deposit adds to the backlog
+  TASK_MINEOUT // task completion withdraws from backlog into real AxisVestingLedgerEntry
+}
+
+// Personal backlog ledger. Balance = SUM(delta) = unmined $AXIS still
+// waiting to be claimed. Deposits are a permanent claim — no expiry — but
+// only mineable by actually doing tasks, gated by the mine-out cap.
+model MiningPoolLedgerEntry {
+  id        String                @id @default(cuid())
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Decimal               @db.Decimal(18, 4)
+  source    MiningPoolEntrySource
+  refId     String?
+  createdAt DateTime              @default(now())
+
+  @@index([userId])
+}
+
+// Admin-editable config for the two genuinely volatile, external numbers
+// that shouldn't be hardcoded: the government petrol subsidy rate (changes
+// by policy announcement — see the fact-check flag on this) and the RM/USD
+// FX rate used to convert RM deposit values into $AXIS at the pool's
+// $0.0005 anchor. One live row; admin updates it in place.
+model AxisMiningConfig {
+  id                String   @id @default(cuid())
+  petrolSubsidyRate Float    @default(0.40)
+  fxRateRmPerUsd    Float    @default(4.76)
+  updatedAt         DateTime @updatedAt
+}
+
+enum AesRevenueTarget {
+  NODE_POOL_A       // 1% of AES net revenue — all verified node holders (1+ nodes)
+  NODE_POOL_B       // 1% — node holders with 5+ nodes (in addition to Pool A)
+  NODE_POOL_C       // 1% — node holders with 10+ nodes (in addition to A+B)
+  BUYBACK_BURN      // 3.5% (50% of the remaining 7%) — real-world $AXIS buyback + burn
+  STRATEGIC_RESERVE // 2.1% (30% of the remaining 7%) — crypto reserve
+  OPERATIONS        // 1.4% (20% of the remaining 7%) — platform operations & growth
+}
+
+// AES net revenue (the broader Alphas Estate Solutions business — HQ sales
+// plus branch/agency contributions, NOT just the 30% AES commission line
+// item from loan disbursements, which is only one contributing stream) is a
+// real consolidated figure that lives outside this platform's database, so
+// an admin logs it manually — same "pending manual review" pattern as
+// node-sale liquidity contributions. Logging one contribution auto-computes
+// and records all six target splits from the fixed percentages above.
+// Balance per target = SUM(amountUsd) WHERE target = X.
+model AesRevenueLedgerEntry {
+  id          String           @id @default(cuid())
+  target      AesRevenueTarget
+  amountUsd   Decimal          @db.Decimal(14, 2)
+  note        String?
+  createdById String?
+  createdAt   DateTime         @default(now())
+}
+
+// One batch-audit record per Pool A/B/C distribution to qualifying node
+// holders, evenly per person within each pool (a 10+ node holder qualifies
+// for and receives a share of all three pools; a 1-4 node holder only Pool
+// A). Paid to the in-app wallet (USD/USDT), same as the existing quarterly
+// AxisPrestige revenue share.
+model AesNodePoolDistribution {
+  id          String   @id @default(cuid())
+  target      AesRevenueTarget
+  totalUsd    Decimal  @db.Decimal(14, 2)
+  recipients  Int
+  perPersonUsd Decimal @db.Decimal(14, 2)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  lines AesNodePoolDistributionLine[]
+}
+
+model AesNodePoolDistributionLine {
+  id             String                  @id @default(cuid())
+  distributionId String
+  distribution   AesNodePoolDistribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                    @relation(fields: [userId], references: [id])
+  amountUsd      Decimal                 @db.Decimal(14, 2)
+
+  @@index([distributionId])
   @@index([userId])
 }

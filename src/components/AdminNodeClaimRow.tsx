@@ -7,11 +7,14 @@ export function AdminNodeClaimRow({
   nftHoldingId,
   name,
   walletAddress,
+  claimedNodeCount,
 }: {
   nftHoldingId: string;
   name: string;
   walletAddress: string | null;
+  claimedNodeCount: number;
 }) {
+  const [nodeCount, setNodeCount] = useState(String(claimedNodeCount));
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState<"approved" | "rejected" | undefined>();
 
@@ -34,9 +37,21 @@ export function AdminNodeClaimRow({
         <div className="min-w-0 flex-1">
           <p className="row-title">{name}</p>
           <p className="row-sub">
-            {walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : "No wallet on file"}
+            {walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : "No wallet on file"} · claims{" "}
+            {claimedNodeCount} node(s)
           </p>
         </div>
+      </div>
+      <div className="mb-2 flex gap-2">
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={nodeCount}
+          onChange={(e) => setNodeCount(e.target.value)}
+          className="min-w-0 flex-1 rounded-[10px] border border-[var(--gold-border)] bg-[var(--card2)] px-3 py-2 text-[12px] font-semibold text-white"
+        />
+        <span className="p-note self-center !mb-0">verified node count (check turbox.bond)</span>
       </div>
       <div className="grid2 mt-[-4px]">
         <button
@@ -45,12 +60,12 @@ export function AdminNodeClaimRow({
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              await reviewNodeVerification(nftHoldingId, true);
+              await reviewNodeVerification(nftHoldingId, true, Number(nodeCount));
               setDone("approved");
             })
           }
         >
-          Verify node
+          Verify node(s)
         </button>
         <button
           className="btn ghost"

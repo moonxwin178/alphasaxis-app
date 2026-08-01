@@ -10,15 +10,17 @@ import type { AxisLedgerSource } from "@/generated/prisma/client";
  * AxisPrestige's $0.0001 founder mint price), 60-month (5yr) vesting
  * horizon. Seeded once into AxisMiningPoolConfig — see prisma/schema.prisma.
  *
- * TierWeight matches the existing AxisZero/One/Pro Agent2Mine multipliers in
- * src/lib/commission.ts (0.5 / 1.5 / 2.0). AxisPrestige holders aren't part
- * of Agent2Mine task-mining — they draw from the separate quarterly
- * distribution instead (src/lib/axisPrestigeDistribution.ts).
+ * TierWeight matches the existing AxisZero/One/Pro/Prestige Agent2Mine
+ * multipliers in src/lib/commission.ts (0.5 / 1.5 / 2.0 / 3.0). AxisPrestige
+ * holders participate in this same deposit-and-mine-out system on top of
+ * (not instead of) their separate node token-vesting and AES revenue-share
+ * tracks — per the confirmed design, "same rules apply."
  */
 export const TIER_WEIGHT = {
   AXIS_ZERO: 0.5,
   AXIS_ONE: 1.5,
   AXIS_PRO: 2.0,
+  AXIS_PRESTIGE: 3.0,
 } as const;
 
 export type MiningTier = keyof typeof TIER_WEIGHT;
@@ -99,7 +101,7 @@ export async function getEmissionSnapshot() {
     }),
     prisma.nftHolding.findMany({
       where: {
-        tier: { in: ["AXIS_ZERO", "AXIS_ONE", "AXIS_PRO"] },
+        tier: { in: ["AXIS_ZERO", "AXIS_ONE", "AXIS_PRO", "AXIS_PRESTIGE"] },
         verificationStatus: "VERIFIED",
       },
       distinct: ["userId"],
@@ -113,16 +115,14 @@ export async function getEmissionSnapshot() {
   const monthsLeft = remainingMonths(config.startDate, config.vestingMonths);
   const budget = monthlyEmissionBudget(remainingPool, monthsLeft);
 
-  const activeUsers: ActiveUserCount[] = (["AXIS_ZERO", "AXIS_ONE", "AXIS_PRO"] as MiningTier[]).map((tier) => ({
+  const ALL_TIERS: MiningTier[] = ["AXIS_ZERO", "AXIS_ONE", "AXIS_PRO", "AXIS_PRESTIGE"];
+  const activeUsers: ActiveUserCount[] = ALL_TIERS.map((tier) => ({
     tier,
     count: nftHoldings.filter((h) => h.tier === tier).length,
   }));
 
   const capByTier = Object.fromEntries(
-    (["AXIS_ZERO", "AXIS_ONE", "AXIS_PRO"] as MiningTier[]).map((tier) => [
-      tier,
-      perUserMonthlyCap(budget, tier, activeUsers),
-    ])
+    ALL_TIERS.map((tier) => [tier, perUserMonthlyCap(budget, tier, activeUsers)])
   ) as Record<MiningTier, number>;
 
   return {

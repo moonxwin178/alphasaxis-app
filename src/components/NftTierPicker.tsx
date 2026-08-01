@@ -14,6 +14,7 @@ const AUTO_TIERS = [
 
 export function NftTierPicker({ returnTo }: { returnTo: string }) {
   const [wallet, setWallet] = useState("");
+  const [nodeCount, setNodeCount] = useState("1");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -48,9 +49,10 @@ export function NftTierPicker({ returnTo }: { returnTo: string }) {
         <div className="min-w-0 flex-1">
           <p className="row-title">AxisPrestige — Node holder</p>
           <p className="row-sub">
-            Minted on app.turbox.bond/node-pad, not here. Enter the wallet that holds your Node to
+            Minted on app.turbox.bond/node-pad, not here. Enter the wallet that holds your Node(s) to
             request verification — an admin confirms on-chain ownership before the 3x multiplier
-            applies.
+            applies. Multiple nodes per person are allowed — the multiplier stays 3x either way, but
+            each node earns its own vesting allocation.
           </p>
         </div>
       </div>
@@ -58,16 +60,29 @@ export function NftTierPicker({ returnTo }: { returnTo: string }) {
       {submitted ? (
         <p className="p-note">Verification requested. We&apos;ll confirm it shortly.</p>
       ) : (
-        <div className="field">
-          <label htmlFor="wallet">Node holder wallet address</label>
-          <input
-            id="wallet"
-            type="text"
-            placeholder="0x…"
-            value={wallet}
-            onChange={(e) => setWallet(e.target.value)}
-          />
-        </div>
+        <>
+          <div className="field">
+            <label htmlFor="wallet">Node holder wallet address</label>
+            <input
+              id="wallet"
+              type="text"
+              placeholder="0x…"
+              value={wallet}
+              onChange={(e) => setWallet(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="nodeCount">How many nodes does this wallet hold?</label>
+            <input
+              id="nodeCount"
+              type="number"
+              min={1}
+              step={1}
+              value={nodeCount}
+              onChange={(e) => setNodeCount(e.target.value)}
+            />
+          </div>
+        </>
       )}
 
       {error && <p className="p-note text-[var(--red)]">{error}</p>}
@@ -78,7 +93,7 @@ export function NftTierPicker({ returnTo }: { returnTo: string }) {
           disabled={!wallet.trim() || pending}
           onClick={() =>
             startTransition(async () => {
-              const res = await submitNodeVerification(wallet.trim());
+              const res = await submitNodeVerification(wallet.trim(), Number(nodeCount));
               if (res?.error) {
                 setError(res.error);
                 return;

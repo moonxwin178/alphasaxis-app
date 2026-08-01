@@ -2,6 +2,7 @@ import "server-only";
 import { getPrisma } from "./prisma";
 import { getGrandMasterId } from "./grandMaster";
 import type { BrokerageTier } from "./commissionEngine";
+import type { MiningTier } from "./axisEmission";
 import type { NftTier } from "@/generated/prisma/client";
 
 const TIER_RANK: Record<Extract<NftTier, "AXIS_ZERO" | "AXIS_ONE" | "AXIS_PRO">, number> = {
@@ -9,6 +10,35 @@ const TIER_RANK: Record<Extract<NftTier, "AXIS_ZERO" | "AXIS_ONE" | "AXIS_PRO">,
   AXIS_ONE: 1,
   AXIS_PRO: 2,
 };
+
+const MINING_TIER_RANK: Record<MiningTier, number> = {
+  AXIS_ZERO: 0,
+  AXIS_ONE: 1,
+  AXIS_PRO: 2,
+  AXIS_PRESTIGE: 3,
+};
+
+/**
+ * A user's tier for Agent2Mine deposit-quota/mine-out purposes — their best
+ * VERIFIED holding among all four tiers, AxisPrestige included (unlike
+ * resolveBrokerageTier below, which deliberately excludes it — Prestige
+ * holders participate in the same deposit-and-mine-out system on top of
+ * their separate node track).
+ */
+export async function resolveMiningTier(userId: string): Promise<MiningTier> {
+  const prisma = getPrisma();
+  const holdings = await prisma.nftHolding.findMany({
+    where: { userId, verificationStatus: "VERIFIED" },
+    select: { tier: true },
+  });
+
+  let best: MiningTier = "AXIS_ZERO";
+  for (const h of holdings) {
+    const tier = h.tier as MiningTier;
+    if (tier in MINING_TIER_RANK && MINING_TIER_RANK[tier] > MINING_TIER_RANK[best]) best = tier;
+  }
+  return best;
+}
 
 /**
  * A user's brokerage tier for commission purposes — their best VERIFIED
