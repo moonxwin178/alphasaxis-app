@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { AdminMiningRow } from "@/components/AdminMiningRow";
+import { AiVerificationPreview } from "@/components/AiVerificationPreview";
 import { getEmissionSnapshot, type MiningTier } from "@/lib/axisEmission";
 import { resolveBrokerageTier } from "@/lib/commissionResolve";
 
@@ -62,21 +63,29 @@ export default async function AdminMiningPage() {
 
         {rows.length === 0 && <p className="p-note">No pending submissions.</p>}
         {rows.map(({ submission: s, tier, suggestedAmount }) => (
-          <AdminMiningRow
-            key={s.id}
-            submissionId={s.id}
-            title={`${TASK_LABEL[s.taskType]} — ${s.user.name}`}
-            sub={
-              s.status === "FLAGGED_DUPLICATE"
-                ? `Flagged: ${s.rejectionReason ?? "possible duplicate"} · Tier ${tier}`
-                : `${
-                    s.taskType === "PETROL_RECEIPT"
-                      ? `${s.merchantName} — RM ${Number(s.subsidyAmountRm ?? 0).toLocaleString()}`
-                      : `${s.metaAdsCategory} — $${Number(s.metaAdsSpendUsd ?? 0).toLocaleString()}`
-                  } · Tier ${tier}`
-            }
-            suggestedAmount={suggestedAmount}
-          />
+          <div key={s.id}>
+            {s.taskType === "PETROL_RECEIPT" && (
+              <AiVerificationPreview
+                merchantName={s.merchantName}
+                receiptNumber={s.receiptNumber}
+                subsidyAmountRm={s.subsidyAmountRm ? Number(s.subsidyAmountRm) : null}
+              />
+            )}
+            <AdminMiningRow
+              submissionId={s.id}
+              title={`${TASK_LABEL[s.taskType]} — ${s.user.name}`}
+              sub={
+                s.status === "FLAGGED_DUPLICATE"
+                  ? `Flagged: ${s.rejectionReason ?? "possible duplicate"} · Tier ${tier}`
+                  : `${
+                      s.taskType === "PETROL_RECEIPT"
+                        ? `${s.merchantName} — RM ${Number(s.subsidyAmountRm ?? 0).toLocaleString()}`
+                        : `${s.metaAdsCategory} — $${Number(s.metaAdsSpendUsd ?? 0).toLocaleString()}`
+                    } · Tier ${tier}`
+              }
+              suggestedAmount={suggestedAmount}
+            />
+          </div>
         ))}
       </div>
     </div>

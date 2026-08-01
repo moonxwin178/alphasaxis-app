@@ -5,6 +5,7 @@ import { getPointsBalance } from "@/lib/points";
 import { getWalletBalance } from "@/lib/wallet";
 import { AppHeader } from "@/components/AppHeader";
 import { TopUpForm } from "@/components/TopUpForm";
+import { WalletConnectMockup } from "@/components/WalletConnectMockup";
 
 const POINTS_REASON_LABEL: Record<string, string> = {
   SPEND_TO_EARN: "Spend to earn reward",
@@ -24,6 +25,7 @@ const WALLET_REASON_LABEL: Record<string, string> = {
   AGENCY_MEMBERSHIP: "Agency membership fee",
   AGENCY_MEMBERSHIP_REFUND: "Agency membership refund",
   ADMIN_ADJUST: "Adjustment",
+  AXISPRESTIGE_REVENUE_SHARE: "AxisPrestige revenue share",
 };
 
 export default async function WalletPage() {
@@ -55,6 +57,8 @@ export default async function WalletPage() {
             <div className="value">${usdBalance.toLocaleString()}</div>
           </div>
         </div>
+
+        <WalletConnectMockup />
 
         <div>
           <p className="eyebrow">Top up</p>
