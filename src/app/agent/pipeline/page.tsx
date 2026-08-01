@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { AgentEntitlementsCard } from "@/components/AgentEntitlementsCard";
+import { LogoutButton } from "@/components/LogoutButton";
 
 const FINANCING_LABEL: Record<string, string> = {
   MORTGAGE: "Home loan",
@@ -77,6 +78,10 @@ export default async function AgentPipelinePage() {
             </Link>
           );
         })}
+
+        <div className="mt-2">
+          <LogoutButton />
+        </div>
       </div>
     </div>
   );

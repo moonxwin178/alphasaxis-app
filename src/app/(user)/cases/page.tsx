@@ -26,10 +26,15 @@ export default async function CasesPage() {
   const user = await requireRole("USER");
   const prisma = getPrisma();
 
-  const cases = await prisma.case.findMany({
-    where: { applicantId: user.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const [cases, prestigeHolding] = await Promise.all([
+    prisma.case.findMany({
+      where: { applicantId: user.id },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.nftHolding.findFirst({
+      where: { userId: user.id, tier: "AXIS_PRESTIGE", verificationStatus: { in: ["PENDING", "VERIFIED"] } },
+    }),
+  ]);
 
   const totalFinanced = cases
     .filter((c) => c.status === "APPROVED" || c.status === "DISBURSED")
@@ -137,25 +142,27 @@ export default async function CasesPage() {
           </div>
         </div>
 
-        <Link
-          href="/nft-verification?return=/cases"
-          className="card !mb-0 flex items-center gap-3 border-[var(--gold-light)] bg-[linear-gradient(135deg,rgba(255,218,164,0.1),rgba(158,124,69,0.04))]"
-        >
-          <div className="card-icon !m-0 bg-[linear-gradient(135deg,var(--gold-light),var(--gold))] text-[#241505]">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-              <path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z" />
-            </svg>
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="row-title">Own an AxisPrestige Node?</p>
-            <p className="row-sub">Verify it for the 3x Agent2Mine multiplier</p>
-          </div>
-          <div className="chev">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </div>
-        </Link>
+        {!prestigeHolding && (
+          <Link
+            href="/nft-verification?return=/cases"
+            className="card !mb-0 flex items-center gap-3 border-[var(--gold-light)] bg-[linear-gradient(135deg,rgba(255,218,164,0.1),rgba(158,124,69,0.04))]"
+          >
+            <div className="card-icon !m-0 bg-[linear-gradient(135deg,var(--gold-light),var(--gold))] text-[#241505]">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                <path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="row-title">Own an AxisPrestige Node?</p>
+              <p className="row-sub">Verify it for the 3x Agent2Mine multiplier</p>
+            </div>
+            <div className="chev">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </div>
+          </Link>
+        )}
       </div>
     </div>
   );

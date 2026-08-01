@@ -3,6 +3,7 @@ import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { InviteAgentForm } from "@/components/InviteAgentForm";
 import { AgencyEntitlementsCard } from "@/components/AgencyEntitlementsCard";
+import { LogoutButton } from "@/components/LogoutButton";
 
 export default async function AgencyAgentsPage() {
   const owner = await requireRole("AGENCY");
@@ -67,6 +68,10 @@ export default async function AgencyAgentsPage() {
 
         <div className="mt-2">
           <InviteAgentForm />
+        </div>
+
+        <div className="mt-2">
+          <LogoutButton />
         </div>
       </div>
     </div>
