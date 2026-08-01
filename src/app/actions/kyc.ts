@@ -18,6 +18,17 @@ async function ensureSubmission(userId: string) {
   return prisma.kycSubmission.create({ data: { userId } });
 }
 
+export async function setKycNationality(nationality: string): Promise<KycFormState> {
+  const user = await requireUser();
+  const clean = nationality.trim().slice(0, 60);
+  if (!clean) return { error: "Select your nationality." };
+
+  const submission = await ensureSubmission(user.id);
+  const prisma = getPrisma();
+  await prisma.kycSubmission.update({ where: { id: submission.id }, data: { nationality: clean } });
+  return undefined;
+}
+
 export async function uploadKycDocument(
   _prevState: KycFormState,
   formData: FormData

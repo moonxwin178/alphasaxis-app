@@ -6,18 +6,20 @@ import { getPrisma } from "@/lib/prisma";
 import { uploadPrivateFile } from "@/lib/blob";
 import { computePerceptualHash, checkDuplicateReceipt } from "@/lib/receiptFraud";
 import { stripControlChars } from "@/lib/apiSecurity";
+import { isCountryAllowedForMining, ALLOWED_MINING_COUNTRIES } from "@/lib/regionGate";
 
 export type MiningFormState = { error?: string; ok?: boolean } | undefined;
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const PETROL_MERCHANTS = ["Petron", "Petronas", "Shell"] as const;
 
+const REGION_ERROR = `Currently open to ${ALLOWED_MINING_COUNTRIES.join(", ")} residents only — more of Southeast Asia is opening up soon as AlphasAxis expands.`;
+
 /**
- * Spend-to-Earn: government RON95/diesel subsidy receipts. Restricted in
- * spirit to KYC'd Malaysians — enforced here by requiring KYC VERIFIED
- * status (NRIC/passport review), since there's no separate nationality
- * field in the schema. Flagged to the user as worth a dedicated
- * citizenship field if stricter gating is needed.
+ * Spend-to-Earn: government RON95/diesel subsidy receipts. Gated on both
+ * KYC VERIFIED status and nationality — Malaysia only at launch, per the
+ * confirmed rule that Spend-to-Earn/Submit-to-Earn tasks are region-gated
+ * while Network-to-Earn/Social-to-Earn stay global (see regionGate.ts).
  */
 export async function submitPetrolReceipt(
   _prevState: MiningFormState,
@@ -29,6 +31,9 @@ export async function submitPetrolReceipt(
   const kyc = await prisma.kycSubmission.findUnique({ where: { userId: user.id } });
   if (kyc?.status !== "VERIFIED") {
     return { error: "Identity verification (KYC) must be approved before submitting subsidy receipts." };
+  }
+  if (!isCountryAllowedForMining(kyc.nationality)) {
+    return { error: REGION_ERROR };
   }
 
   const file = formData.get("receipt");
@@ -86,6 +91,15 @@ export async function submitMetaAdsOnboarding(
   formData: FormData
 ): Promise<MiningFormState> {
   const user = await requireUser();
+  const prisma = getPrisma();
+
+  const kyc = await prisma.kycSubmission.findUnique({ where: { userId: user.id } });
+  if (kyc?.status !== "VERIFIED") {
+    return { error: "Identity verification (KYC) must be approved before onboarding ad spend." };
+  }
+  if (!isCountryAllowedForMining(kyc.nationality)) {
+    return { error: REGION_ERROR };
+  }
 
   const file = formData.get("proof");
   const category = String(formData.get("category") ?? "");
@@ -101,7 +115,6 @@ export async function submitMetaAdsOnboarding(
   const arrayBuffer = await file.arrayBuffer();
   const blobPath = await uploadPrivateFile(`mining/${user.id}`, file.name, arrayBuffer);
 
-  const prisma = getPrisma();
   await prisma.axisMiningSubmission.create({
     data: {
       userId: user.id,

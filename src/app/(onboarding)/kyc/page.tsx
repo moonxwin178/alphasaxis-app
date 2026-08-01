@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { KycDocRow } from "@/components/KycDocRow";
+import { NationalitySelect } from "@/components/NationalitySelect";
 import { submitKycForReview } from "@/app/actions/kyc";
 
 export default async function KycPage() {
@@ -29,6 +30,8 @@ export default async function KycPage() {
           <div className="progress-fill" style={{ width: `${Math.min(uploadedCount, 3) * 33.3}%` }} />
         </div>
         <p className="p-note mt-1">{uploadedCount} of 3 documents uploaded</p>
+
+        <NationalitySelect initialValue={submission?.nationality ?? null} />
 
         <KycDocRow
           docType="NRIC_PASSPORT"
