@@ -10,6 +10,8 @@ import { isCountryAllowedForMining, ALLOWED_MINING_COUNTRIES } from "@/lib/regio
 import { checkDepositQuota } from "@/lib/miningPool";
 import { getMiningConfig } from "@/lib/miningConfig";
 import { ADS_DEPOSIT_RATE } from "@/lib/miningQuota";
+import { claimToVesting, runClaimVestingBatch } from "@/lib/axisClaimVesting";
+import type { VestingLockTier } from "@/generated/prisma/client";
 
 export type MiningFormState = { error?: string; ok?: boolean } | undefined;
 
@@ -170,4 +172,39 @@ export async function submitMetaAdsOnboarding(
 
   revalidatePath("/earn/mine");
   return { ok: true };
+}
+
+export type ClaimVestingFormState = { error?: string; ok?: boolean } | undefined;
+
+/**
+ * Locks a slice of the user's claimable (mined but unlocked) $AXIS into a
+ * fixed-term vesting schedule — see src/lib/axisClaimVesting.ts for the
+ * payout-% table and MPM boost. Also runs the vesting batch first so any
+ * $AXIS due to release from prior schedules lands before the new lock.
+ */
+export async function claimToVestingAction(
+  _prevState: ClaimVestingFormState,
+  formData: FormData
+): Promise<ClaimVestingFormState> {
+  const user = await requireUser();
+
+  const amount = Number(formData.get("amount"));
+  const lockTier = String(formData.get("lockTier") ?? "");
+  const validTiers: VestingLockTier[] = ["SIX_MONTH", "ONE_YEAR", "TWO_YEAR", "THREE_YEAR"];
+  if (!validTiers.includes(lockTier as VestingLockTier)) return { error: "Choose a lock term." };
+
+  await runClaimVestingBatch(user.id);
+
+  const result = await claimToVesting(user.id, amount, lockTier as VestingLockTier);
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath("/earn/mine");
+  revalidatePath("/profile");
+  return { ok: true };
+}
+
+/** Idempotent no-op-safe release of any $AXIS due from vesting schedules — call on page load. */
+export async function refreshClaimVesting(): Promise<void> {
+  const user = await requireUser();
+  await runClaimVestingBatch(user.id);
 }

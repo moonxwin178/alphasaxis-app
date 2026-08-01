@@ -10,7 +10,7 @@ import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
 import { getWalletBalance } from "@/lib/wallet";
 import { PhoneEditRow } from "@/components/PhoneEditRow";
 import { computeVestedTokens } from "@/lib/axisPrestigeVesting";
-import { getAxisVestingBalance } from "@/lib/axisEmission";
+import { getLiquidAxisBalance } from "@/lib/axisClaimVesting";
 
 const KYC_BADGE: Record<string, string> = {
   NOT_SUBMITTED: '<span class="badge amber">Not submitted</span>',
@@ -35,7 +35,7 @@ export default async function ProfilePage() {
       where: { userId: user.id, tier: "AXIS_PRESTIGE", verificationStatus: "PENDING" },
     }),
     getWalletBalance(user.id),
-    getAxisVestingBalance(user.id),
+    getLiquidAxisBalance(user.id),
   ]);
   const currentTier = nftHolding?.tier ?? "AXIS_ZERO";
   const hasPrestige = nftHolding?.tier === "AXIS_PRESTIGE";

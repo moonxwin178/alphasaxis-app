@@ -8,7 +8,7 @@ import { TIER_MULTIPLIER } from "@/lib/commission";
 import { MEMBERSHIP_PRICE_USDT, REFERRAL_COMMISSION_RATE } from "@/lib/membership";
 import { MINT_FEE_LIQUIDITY_SHARE } from "@/lib/liquidityReserve";
 import { payMintWithAxis, MINT_PRICE_AXIS } from "@/lib/mintCycle";
-import { getAxisVestingBalance } from "@/lib/axisEmission";
+import { getLiquidAxisBalance } from "@/lib/axisClaimVesting";
 import type { NftTier, PrismaClient, Role } from "@/generated/prisma/client";
 
 export type RoleAppFormState = { error?: string } | undefined;
@@ -152,7 +152,7 @@ export async function applyForRole(
         await grantMembershipCore(tx, user.id, "AGENT", null);
       });
     } else {
-      const balance = await getAxisVestingBalance(user.id);
+      const balance = await getLiquidAxisBalance(user.id);
       if (balance < MINT_PRICE_AXIS.AGENCY) {
         return { error: `You need ${MINT_PRICE_AXIS.AGENCY.toLocaleString()} $AXIS. You have ${balance.toLocaleString()}.` };
       }

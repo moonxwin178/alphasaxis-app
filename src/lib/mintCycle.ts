@@ -1,8 +1,11 @@
 import "server-only";
 import { getPrisma } from "./prisma";
-import { getAxisVestingBalance } from "./axisEmission";
+import { getLiquidAxisBalance } from "./axisClaimVesting";
 import { REFERRAL_COMMISSION_RATE } from "./membership";
+import { MINT_PRICE_AXIS } from "./mintPricing";
 import type { Role } from "@/generated/prisma/client";
+
+export { MINT_PRICE_AXIS } from "./mintPricing";
 
 /**
  * $AXIS mint-cycling — confirmed design. Users can pay the Agent/Agency
@@ -14,14 +17,6 @@ import type { Role } from "@/generated/prisma/client";
  * anti-dump sink: every mint-cycled token either gets destroyed or stays
  * circulating internally, never becomes new sell-pressure float.
  */
-const ANCHOR_PRICE_USD = 0.0005;
-const MEMBERSHIP_PRICE_USDT: Record<"AGENT" | "AGENCY", number> = { AGENT: 500, AGENCY: 5000 };
-
-export const MINT_PRICE_AXIS: Record<"AGENT" | "AGENCY", number> = {
-  AGENT: MEMBERSHIP_PRICE_USDT.AGENT / ANCHOR_PRICE_USD, // 1,000,000
-  AGENCY: MEMBERSHIP_PRICE_USDT.AGENCY / ANCHOR_PRICE_USD, // 10,000,000
-};
-
 const BURN_SHARE = 0.425;
 const RESERVE_SHARE = 0.425;
 
@@ -40,9 +35,9 @@ export async function payMintWithAxis(userId: string, role: "AGENT" | "AGENCY"):
   const prisma = getPrisma();
   const price = MINT_PRICE_AXIS[role];
 
-  const balance = await getAxisVestingBalance(userId);
+  const balance = await getLiquidAxisBalance(userId);
   if (balance < price) {
-    return { ok: false, error: `You need ${price.toLocaleString()} $AXIS to mint this way. You have ${balance.toLocaleString()}.` };
+    return { ok: false, error: `You need ${price.toLocaleString()} liquid $AXIS to mint this way. You have ${balance.toLocaleString()} vested — lock more of your claimable balance at /earn/mine to build it up.` };
   }
 
   const buyer = await prisma.user.findUnique({ where: { id: userId }, select: { referredById: true } });

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { applyForRole } from "@/app/actions/roleApplication";
 import { MEMBERSHIP_PRICE_USDT } from "@/lib/membership";
-import { MINT_PRICE_AXIS } from "@/lib/mintCycle";
+import { MINT_PRICE_AXIS } from "@/lib/mintPricing";
 
 export function RoleApplicationForm({
   walletBalance,
@@ -54,7 +54,7 @@ export function RoleApplicationForm({
       </p>
       <p className="p-note">
         {paymentMethod === "AXIS"
-          ? `$AXIS balance: ${axisBalance.toLocaleString()}`
+          ? `Liquid $AXIS balance: ${axisBalance.toLocaleString()}`
           : `Wallet balance: $${walletBalance.toLocaleString()}`}
       </p>
 

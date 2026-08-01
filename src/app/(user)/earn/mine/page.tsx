@@ -6,6 +6,14 @@ import { MetaAdsOnboardingForm } from "@/components/MetaAdsOnboardingForm";
 import { getAxisVestingBalance } from "@/lib/axisEmission";
 import { getMiningPoolBalance } from "@/lib/miningPool";
 import { getMiningPowerMultiplier } from "@/lib/miningPowerMultiplier";
+import {
+  LOCK_TIER_CONFIG,
+  getClaimableAxisBalance,
+  getClaimVestingSchedules,
+  getLiquidAxisBalance,
+  runClaimVestingBatch,
+} from "@/lib/axisClaimVesting";
+import { ClaimVestingPanel, type LockTierOption } from "@/components/ClaimVestingPanel";
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: '<span class="badge amber">Review</span>',
@@ -23,12 +31,21 @@ export default async function EarnMinePage() {
   const user = await requireRole("USER");
   const prisma = getPrisma();
 
-  const [minedBalance, poolBalance, mpm, submissions] = await Promise.all([
+  await runClaimVestingBatch(user.id);
+
+  const [minedBalance, poolBalance, mpm, submissions, claimableBalance, liquidBalance, schedules] = await Promise.all([
     getAxisVestingBalance(user.id, "AGENT2MINE_TASK"),
     getMiningPoolBalance(user.id),
     getMiningPowerMultiplier(user.id),
     prisma.axisMiningSubmission.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
+    getClaimableAxisBalance(user.id),
+    getLiquidAxisBalance(user.id),
+    getClaimVestingSchedules(user.id),
   ]);
+
+  const lockTiers: LockTierOption[] = (
+    ["SIX_MONTH", "ONE_YEAR", "TWO_YEAR", "THREE_YEAR"] as const
+  ).map((tier) => ({ tier, ...LOCK_TIER_CONFIG[tier] }));
 
   return (
     <div>
@@ -36,7 +53,7 @@ export default async function EarnMinePage() {
       <div className="flex flex-col gap-4 px-4 pt-4">
         <div className="stat-grid !mb-0">
           <div className="stat">
-            <div className="label">$AXIS mined</div>
+            <div className="label">$AXIS mined (lifetime)</div>
             <div className="value">{minedBalance.toLocaleString()}</div>
           </div>
           <div className="stat">
@@ -44,13 +61,31 @@ export default async function EarnMinePage() {
             <div className="value">{poolBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
           </div>
         </div>
+        <div className="stat-grid !mb-0">
+          <div className="stat">
+            <div className="label">Claimable (unlocked)</div>
+            <div className="value">{claimableBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+          </div>
+          <div className="stat">
+            <div className="label">Liquid $AXIS (spendable)</div>
+            <div className="value">{liquidBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+          </div>
+        </div>
         <div className="card !mb-0">
           <p className="p-note !mb-0">
             Petrol receipts and ad spend deposit real value into your pool above — a permanent claim, no expiry.
             Complete tasks (check-ins, submit-to-earn, social) to mine it out, up to your tier&apos;s weekly/monthly/
-            yearly cap. Your Mining Power Multiplier from active referrals: <b>{mpm.toFixed(2)}x</b>.
+            yearly cap. Mining only makes $AXIS <b>claimable</b> — lock it into a term below to make it spendable.
+            Your Mining Power Multiplier from active referrals: <b>{mpm.toFixed(2)}x</b>.
           </p>
         </div>
+
+        <ClaimVestingPanel
+          claimableBalance={claimableBalance}
+          mpm={mpm}
+          lockTiers={lockTiers}
+          schedules={schedules}
+        />
 
         <PetrolReceiptForm />
         <MetaAdsOnboardingForm />

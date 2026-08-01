@@ -211,6 +211,7 @@ model User {
   miningPoolLedger          MiningPoolLedgerEntry[]
   aesNodePoolLines          AesNodePoolDistributionLine[]
   mintCycleLedger           MintCycleLedgerEntry[]
+  claimVestingSchedules     AxisClaimVestingSchedule[]
 
   @@index([role])
 }
@@ -712,6 +713,36 @@ enum AxisLedgerSource {
   ADMIN_ADJUST
   MINT_CYCLE_PAYMENT
   MINT_CYCLE_REFERRAL
+  CLAIM_VESTING_PAYOUT
+}
+
+enum VestingLockTier {
+  SIX_MONTH
+  ONE_YEAR
+  TWO_YEAR
+  THREE_YEAR
+}
+
+// A user's voluntary choice to lock a slice of their claimable (mined but
+// unlocked) $AXIS into a fixed-term schedule in exchange for a higher payout
+// %. grossAmount is deducted from claimable the instant this row is created
+// (see getClaimableAxisBalance, which nets AGENT2MINE_TASK totals against
+// SUM(grossAmount) across all schedules) — payoutAmount is what actually
+// vests out linearly over lockMonths and becomes spendable via
+// CLAIM_VESTING_PAYOUT ledger entries (see src/lib/axisClaimVesting.ts).
+model AxisClaimVestingSchedule {
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grossAmount      Decimal         @db.Decimal(18, 4)
+  payoutAmount     Decimal         @db.Decimal(18, 4)
+  lockTier         VestingLockTier
+  lockMonths       Int
+  startedAt        DateTime        @default(now())
+  cumulativeVested Decimal         @default(0) @db.Decimal(18, 4)
+  createdAt        DateTime        @default(now())
+
+  @@index([userId])
 }
 
 enum AxisRealizedValueSource {
