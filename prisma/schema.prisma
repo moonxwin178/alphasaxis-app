@@ -210,6 +210,7 @@ model User {
   axisRealizedValueEntries  AxisRealizedValueEntry[]
   miningPoolLedger          MiningPoolLedgerEntry[]
   aesNodePoolLines          AesNodePoolDistributionLine[]
+  mintCycleLedger           MintCycleLedgerEntry[]
 
   @@index([role])
 }
@@ -538,6 +539,11 @@ model PayoutRequest {
   createdAt    DateTime     @default(now())
 }
 
+enum MintPaymentMethod {
+  WALLET
+  AXIS
+}
+
 model RoleApplication {
   id            String             @id @default(cuid())
   userId        String
@@ -545,6 +551,7 @@ model RoleApplication {
   requestedRole Role
   agencyName    String?
   walletAddress String? // wallet used for the $500 (Agent) / $5,000 (Agency) USDT mint, pending real on-chain verification
+  paymentMethod MintPaymentMethod  @default(WALLET)
   status        ApplicationStatus  @default(PENDING)
   reviewedById  String?
   reviewedAt    DateTime?
@@ -645,6 +652,34 @@ model LiquidityReserveEntry {
   createdAt   DateTime               @default(now())
 }
 
+enum MintCycleTarget {
+  BURN
+  AXIS_LIQUIDITY_RESERVE
+  REFERRAL_TIER_1
+  REFERRAL_TIER_2
+}
+
+// Audit trail for $AXIS-denominated Agent/Agency mints (the "mint-cycling"
+// sink, confirmed design): AxisOne = 1,000,000 $AXIS, AxisPro = 10,000,000
+// $AXIS (at the $0.0005 anchor). Referral is paid IN $AXIS on this path
+// (10%/5%, same tier structure as the USDT path) rather than USDT, so the
+// value never leaves the ecosystem. The remaining 85% splits 42.5% burned
+// (permanently destroyed — never re-credited to anyone) / 42.5% into the
+// $AXIS-denominated Liquidity Reserve. One row per target per mint, all
+// summing to the full mint price paid.
+model MintCycleLedgerEntry {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id])
+  role        Role
+  target      MintCycleTarget
+  amountAxis  Decimal         @db.Decimal(18, 4)
+  recipientId String?
+  createdAt   DateTime        @default(now())
+
+  @@index([userId])
+}
+
 // ============================================================================
 // Agent2Mine — Spend-to-Earn $AXIS mining, separate from the gamified
 // PointsLedgerEntry system above. Real numbers confirmed: Agent2Mine
@@ -675,6 +710,8 @@ enum AxisLedgerSource {
   AGENT2MINE_TASK
   AXISPRESTIGE_VESTING
   ADMIN_ADJUST
+  MINT_CYCLE_PAYMENT
+  MINT_CYCLE_REFERRAL
 }
 
 enum AxisRealizedValueSource {

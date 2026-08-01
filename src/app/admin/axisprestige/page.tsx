@@ -11,12 +11,13 @@ import { getLiquidityReserveBalance } from "@/lib/liquidityReserve";
 import { LiquidityReservePanel } from "@/components/LiquidityReservePanel";
 import { getAesTargetBalance } from "@/lib/aesRevenue";
 import { AesRevenuePanel } from "@/components/AesRevenuePanel";
+import { getAxisLiquidityReserveBalance, getTotalAxisBurned } from "@/lib/mintCycle";
 
 export default async function AdminAxisPrestigePage() {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
-  const [pendingClaims, poolBalance, verifiedNodes, nodeVestings, liquidityBalance, aesBalances] = await Promise.all([
+  const [pendingClaims, poolBalance, verifiedNodes, nodeVestings, liquidityBalance, aesBalances, axisReserveBalance, axisBurned] = await Promise.all([
     prisma.nftHolding.findMany({
       where: { tier: "AXIS_PRESTIGE", verificationStatus: "PENDING" },
       include: { user: { select: { name: true } } },
@@ -44,6 +45,8 @@ export default async function AdminAxisPrestigePage() {
       STRATEGIC_RESERVE,
       OPERATIONS,
     })),
+    getAxisLiquidityReserveBalance(),
+    getTotalAxisBurned(),
   ]);
 
   const now = new Date();
@@ -86,7 +89,7 @@ export default async function AdminAxisPrestigePage() {
         )}
 
         <p className="eyebrow mt-2">Liquidity</p>
-        <LiquidityReservePanel balance={liquidityBalance} />
+        <LiquidityReservePanel balance={liquidityBalance} axisReserveBalance={axisReserveBalance} axisBurned={axisBurned} />
 
         <p className="eyebrow mt-2">AES revenue share</p>
         <AesRevenuePanel balances={aesBalances} />

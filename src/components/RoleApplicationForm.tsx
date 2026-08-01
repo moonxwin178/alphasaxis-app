@@ -4,12 +4,22 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { applyForRole } from "@/app/actions/roleApplication";
 import { MEMBERSHIP_PRICE_USDT } from "@/lib/membership";
+import { MINT_PRICE_AXIS } from "@/lib/mintCycle";
 
-export function RoleApplicationForm({ walletBalance }: { walletBalance: number }) {
+export function RoleApplicationForm({
+  walletBalance,
+  axisBalance,
+}: {
+  walletBalance: number;
+  axisBalance: number;
+}) {
   const [state, action, pending] = useActionState(applyForRole, undefined);
   const [role, setRole] = useState<"AGENT" | "AGENCY">("AGENT");
-  const price = MEMBERSHIP_PRICE_USDT[role];
-  const canAfford = walletBalance >= price;
+  const [paymentMethod, setPaymentMethod] = useState<"WALLET" | "AXIS">("WALLET");
+
+  const usdPrice = MEMBERSHIP_PRICE_USDT[role];
+  const axisPrice = MINT_PRICE_AXIS[role];
+  const canAfford = paymentMethod === "WALLET" ? walletBalance >= usdPrice : axisBalance >= axisPrice;
 
   return (
     <form action={action} className="card">
@@ -22,13 +32,34 @@ export function RoleApplicationForm({ walletBalance }: { walletBalance: number }
           Agency — ${MEMBERSHIP_PRICE_USDT.AGENCY.toLocaleString()} USD
         </button>
       </div>
+
+      <p className="eyebrow mt-2 mb-1">Pay with</p>
+      <div className="seg">
+        <button type="button" className={paymentMethod === "WALLET" ? "active" : ""} onClick={() => setPaymentMethod("WALLET")}>
+          Wallet (USD)
+        </button>
+        <button type="button" className={paymentMethod === "AXIS" ? "active" : ""} onClick={() => setPaymentMethod("AXIS")}>
+          $AXIS ({axisPrice.toLocaleString()})
+        </button>
+      </div>
+
       <p className="p-note">
-        {role === "AGENT"
-          ? "Deducted from your wallet balance and activates instantly."
-          : "Deducted from your wallet balance now; activates once an admin approves (refunded if declined)."}
+        {paymentMethod === "AXIS"
+          ? `Mine-cycling: pay with your earned $AXIS instead of cash. 15% pays your referrer (in $AXIS), the rest is burned or reserved for liquidity — nothing re-enters circulation as sell pressure. ${
+              role === "AGENT" ? "Activates instantly." : "Activates once an admin approves."
+            }`
+          : role === "AGENT"
+            ? "Deducted from your wallet balance and activates instantly."
+            : "Deducted from your wallet balance now; activates once an admin approves (refunded if declined)."}
       </p>
-      <p className="p-note">Wallet balance: ${walletBalance.toLocaleString()}</p>
+      <p className="p-note">
+        {paymentMethod === "AXIS"
+          ? `$AXIS balance: ${axisBalance.toLocaleString()}`
+          : `Wallet balance: $${walletBalance.toLocaleString()}`}
+      </p>
+
       <input type="hidden" name="requestedRole" value={role} />
+      <input type="hidden" name="paymentMethod" value={paymentMethod} />
       {role === "AGENCY" && (
         <div className="field">
           <label htmlFor="agencyName">Agency name</label>
@@ -40,9 +71,13 @@ export function RoleApplicationForm({ walletBalance }: { walletBalance: number }
         <button className="btn secondary" type="submit" disabled={pending}>
           {pending ? "Submitting…" : role === "AGENT" ? "Activate Agent" : "Submit for Approval"}
         </button>
-      ) : (
+      ) : paymentMethod === "WALLET" ? (
         <Link href="/wallet" className="btn secondary">
           Top Up Wallet
+        </Link>
+      ) : (
+        <Link href="/earn/mine" className="btn secondary">
+          Mine more $AXIS
         </Link>
       )}
     </form>

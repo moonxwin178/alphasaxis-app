@@ -5,6 +5,7 @@ import { AdminMiningRow } from "@/components/AdminMiningRow";
 import { AiVerificationPreview } from "@/components/AiVerificationPreview";
 import { resolveMiningTier } from "@/lib/commissionResolve";
 import { getMiningConfig } from "@/lib/miningConfig";
+import { getEmissionSnapshot, HALVING_MILESTONE_MINERS } from "@/lib/axisEmission";
 
 const TASK_LABEL: Record<string, string> = {
   PETROL_RECEIPT: "Petrol subsidy receipt",
@@ -15,7 +16,7 @@ export default async function AdminMiningPage() {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
-  const [submissions, config] = await Promise.all([
+  const [submissions, config, snapshot] = await Promise.all([
     prisma.axisMiningSubmission.findMany({
       where: { status: { in: ["PENDING", "FLAGGED_DUPLICATE"] } },
       include: { user: { select: { name: true } } },
@@ -23,6 +24,7 @@ export default async function AdminMiningPage() {
       take: 30,
     }),
     getMiningConfig(),
+    getEmissionSnapshot(),
   ]);
 
   const rows = await Promise.all(
@@ -43,6 +45,18 @@ export default async function AdminMiningPage() {
             /USD — edit in code/DB as government policy or FX changes.
           </p>
         </div>
+
+        {snapshot && (
+          <div className="card">
+            <p className="row-title mb-1">Emission pool</p>
+            <p className="row-sub">
+              Halving epoch {snapshot.halvingEpoch} ({HALVING_MILESTONE_MINERS.toLocaleString()} miners/halving) ·
+              monthly budget {snapshot.monthlyEmissionBudget.toLocaleString(undefined, { maximumFractionDigits: 0 })}{" "}
+              $AXIS · caps — Zero {snapshot.capByTier.AXIS_ZERO.toFixed(2)}, One {snapshot.capByTier.AXIS_ONE.toFixed(2)}
+              , Pro {snapshot.capByTier.AXIS_PRO.toFixed(2)}, Prestige {snapshot.capByTier.AXIS_PRESTIGE.toFixed(2)}
+            </p>
+          </div>
+        )}
 
         {rows.length === 0 && <p className="p-note">No pending submissions.</p>}
         {rows.map(({ submission: s, tier }) => (

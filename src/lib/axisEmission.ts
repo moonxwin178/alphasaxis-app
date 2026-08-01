@@ -7,8 +7,8 @@ import type { AxisLedgerSource } from "@/generated/prisma/client";
  *
  * Confirmed real numbers: pool = 32% of 178B total $AXIS supply = 56.96B
  * tokens, anchor price $0.0005 for this pool specifically (distinct from
- * AxisPrestige's $0.0001 founder mint price), 60-month (5yr) vesting
- * horizon. Seeded once into AxisMiningPoolConfig — see prisma/schema.prisma.
+ * AxisPrestige's $0.0001 founder mint price). Seeded once into
+ * AxisMiningPoolConfig — see prisma/schema.prisma.
  *
  * TierWeight matches the existing AxisZero/One/Pro/Prestige Agent2Mine
  * multipliers in src/lib/commission.ts (0.5 / 1.5 / 2.0 / 3.0). AxisPrestige
@@ -30,16 +30,46 @@ export interface ActiveUserCount {
   count: number;
 }
 
-/** RemainingMonths = vestingMonths - whole months elapsed since startDate, floored at 1 so the pool never divides by zero once exhausted. */
-export function remainingMonths(startDate: Date, vestingMonths: number, now: Date = new Date()): number {
-  const elapsedMs = now.getTime() - startDate.getTime();
-  const elapsedMonths = Math.floor(elapsedMs / (30.44 * 24 * 60 * 60 * 1000));
-  return Math.max(1, vestingMonths - elapsedMonths);
+/**
+ * Milestone-based halving (confirmed: every 17,800 net-new active miners),
+ * NOT calendar-based. This replaces the earlier RemainingMonths countdown,
+ * which had a real cliff bug: if actual usage ran below the calculated
+ * caps (very likely in year one), the calendar clock still hit its floor
+ * at month 60 regardless, at which point the ENTIRE unclaimed remainder
+ * would become claimable in a single month. Tying the decay to cumulative
+ * onboarded miners instead means slow growth genuinely stretches the
+ * runway and fast growth means scarcity arrives sooner — either way the
+ * platform is winning, and there's no cliff.
+ *
+ * Each halving epoch's effective monthly rate is BASE_MONTHLY_RATE × 0.5^epoch,
+ * where BASE_MONTHLY_RATE is the pool's original month-1 rate (totalPool ÷ 60).
+ * Asymptotic — mathematically never reaches exactly zero (same as Bitcoin's
+ * satoshi tail), practically ~99.9% distributed by epoch 10.
+ */
+export const HALVING_MILESTONE_MINERS = 17_800;
+
+export async function getHalvingEpoch(): Promise<number> {
+  const prisma = getPrisma();
+  const [taskMiners, depositMiners] = await Promise.all([
+    prisma.axisVestingLedgerEntry.findMany({
+      where: { source: "AGENT2MINE_TASK" },
+      distinct: ["userId"],
+      select: { userId: true },
+    }),
+    prisma.miningPoolLedgerEntry.findMany({
+      where: { source: "DEPOSIT" },
+      distinct: ["userId"],
+      select: { userId: true },
+    }),
+  ]);
+  const cumulativeMiners = new Set([...taskMiners.map((m) => m.userId), ...depositMiners.map((m) => m.userId)]).size;
+  return Math.floor(cumulativeMiners / HALVING_MILESTONE_MINERS);
 }
 
-/** MonthlyEmissionBudget = RemainingPool ÷ RemainingMonths. */
-export function monthlyEmissionBudget(remainingPool: number, monthsLeft: number): number {
-  return remainingPool / monthsLeft;
+/** Effective monthly budget at a given halving epoch — the pool's month-1 rate, halved once per epoch crossed. */
+export function monthlyBudgetForEpoch(totalPool: number, vestingMonths: number, epoch: number): number {
+  const baseMonthlyRate = totalPool / vestingMonths;
+  return baseMonthlyRate * Math.pow(0.5, epoch);
 }
 
 /**
@@ -56,8 +86,9 @@ export function perUserMonthlyCap(
   return (monthlyBudget * TIER_WEIGHT[tier]) / weightedTotal;
 }
 
-// Confirmed real numbers: 32% of 178B total $AXIS supply, 60-month horizon,
-// $0.0005 anchor price for this pool specifically.
+// Confirmed real numbers: 32% of 178B total $AXIS supply, 60-month horizon
+// (used only as the BASE_MONTHLY_RATE reference for halving, not a hard
+// deadline anymore), $0.0005 anchor price for this pool specifically.
 const AGENT2MINE_POOL_TOKENS = 56_960_000_000;
 const AGENT2MINE_VESTING_MONTHS = 60;
 const AGENT2MINE_ANCHOR_PRICE_USD = 0.0005;
@@ -94,7 +125,7 @@ export async function getEmissionSnapshot() {
 
   const config = await getOrCreatePoolConfig();
 
-  const [awardedAgg, nftHoldings] = await Promise.all([
+  const [awardedAgg, nftHoldings, halvingEpoch] = await Promise.all([
     prisma.axisVestingLedgerEntry.aggregate({
       where: { source: "AGENT2MINE_TASK" },
       _sum: { delta: true },
@@ -107,13 +138,13 @@ export async function getEmissionSnapshot() {
       distinct: ["userId"],
       select: { tier: true },
     }),
+    getHalvingEpoch(),
   ]);
 
   const totalPool = Number(config.totalPoolTokens);
   const alreadyAwarded = Number(awardedAgg._sum.delta ?? 0);
   const remainingPool = Math.max(0, totalPool - alreadyAwarded);
-  const monthsLeft = remainingMonths(config.startDate, config.vestingMonths);
-  const budget = monthlyEmissionBudget(remainingPool, monthsLeft);
+  const budget = monthlyBudgetForEpoch(totalPool, config.vestingMonths, halvingEpoch);
 
   const ALL_TIERS: MiningTier[] = ["AXIS_ZERO", "AXIS_ONE", "AXIS_PRO", "AXIS_PRESTIGE"];
   const activeUsers: ActiveUserCount[] = ALL_TIERS.map((tier) => ({
@@ -128,7 +159,7 @@ export async function getEmissionSnapshot() {
   return {
     totalPool,
     remainingPool,
-    monthsLeft,
+    halvingEpoch,
     monthlyEmissionBudget: budget,
     anchorPriceUsd: Number(config.anchorPriceUsd),
     activeUsers,

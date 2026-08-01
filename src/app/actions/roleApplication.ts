@@ -7,6 +7,8 @@ import { getWalletBalance } from "@/lib/wallet";
 import { TIER_MULTIPLIER } from "@/lib/commission";
 import { MEMBERSHIP_PRICE_USDT, REFERRAL_COMMISSION_RATE } from "@/lib/membership";
 import { MINT_FEE_LIQUIDITY_SHARE } from "@/lib/liquidityReserve";
+import { payMintWithAxis, MINT_PRICE_AXIS } from "@/lib/mintCycle";
+import { getAxisVestingBalance } from "@/lib/axisEmission";
 import type { NftTier, PrismaClient, Role } from "@/generated/prisma/client";
 
 export type RoleAppFormState = { error?: string } | undefined;
@@ -18,13 +20,8 @@ const TIER_FOR_ROLE: Record<"AGENT" | "AGENCY", NftTier> = {
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
-/**
- * Grants the role + its identity NFT, and records the Tier 1 (10%) / Tier 2
- * (5%) USDT referral commissions on the mint price. The membership fee itself
- * is deducted from the in-app wallet balance separately, at the call site —
- * this only handles what happens once payment is confirmed.
- */
-async function grantMembership(tx: Tx, userId: string, role: "AGENT" | "AGENCY", agencyName: string | null) {
+/** Just the role/profile/NFT grant — no payment or referral logic. Shared by both payment paths. */
+async function grantMembershipCore(tx: Tx, userId: string, role: "AGENT" | "AGENCY", agencyName: string | null) {
   await tx.user.update({ where: { id: userId }, data: { role: role as Role } });
 
   if (role === "AGENT") {
@@ -42,6 +39,19 @@ async function grantMembership(tx: Tx, userId: string, role: "AGENT" | "AGENCY",
   if (!existingHolding) {
     await tx.nftHolding.create({ data: { userId, tier, multiplier: TIER_MULTIPLIER[tier] } });
   }
+}
+
+/**
+ * Grants the role + its identity NFT, and records the Tier 1 (10%) / Tier 2
+ * (5%) USDT referral commissions on the mint price. The membership fee itself
+ * is deducted from the in-app wallet balance separately, at the call site —
+ * this only handles what happens once payment is confirmed. USDT path only —
+ * the $AXIS mint-cycling path (see payMintWithAxis) handles its own referral
+ * payout in $AXIS instead, since burning tokens can't be refunded the way a
+ * USDT wallet deduction can.
+ */
+async function grantMembership(tx: Tx, userId: string, role: "AGENT" | "AGENCY", agencyName: string | null) {
+  await grantMembershipCore(tx, userId, role, agencyName);
 
   const buyer = await tx.user.findUnique({ where: { id: userId }, select: { referredById: true } });
   const mintPrice = MEMBERSHIP_PRICE_USDT[role];
@@ -99,12 +109,16 @@ export async function applyForRole(
   const user = await requireUser();
   const requestedRole = String(formData.get("requestedRole") ?? "");
   const agencyName = String(formData.get("agencyName") ?? "").trim().slice(0, 120);
+  const paymentMethod = String(formData.get("paymentMethod") ?? "WALLET");
 
   if (requestedRole !== "AGENT" && requestedRole !== "AGENCY") {
     return { error: "Invalid role requested." };
   }
   if (requestedRole === "AGENCY" && agencyName.length < 2) {
     return { error: "Please enter your agency name." };
+  }
+  if (paymentMethod !== "WALLET" && paymentMethod !== "AXIS") {
+    return { error: "Invalid payment method." };
   }
 
   const prisma = getPrisma();
@@ -115,32 +129,65 @@ export async function applyForRole(
   if (existing) return { error: "You already have a pending application." };
 
   const price = MEMBERSHIP_PRICE_USDT[requestedRole];
-  const balance = await getWalletBalance(user.id);
-  if (balance < price) {
-    return { error: `You need $${price.toLocaleString()} in your wallet. Top up and try again.` };
-  }
 
-  if (requestedRole === "AGENT") {
-    // Deducted and activated instantly — no admin gate.
-    await prisma.$transaction(async (tx) => {
-      const application = await tx.roleApplication.create({
-        data: { userId: user.id, requestedRole: "AGENT", status: "APPROVED", reviewedAt: new Date() },
+  if (paymentMethod === "AXIS") {
+    // $AXIS mint-cycling path — burning tokens can't be refunded the way a
+    // USDT deduction can, so for Agency (admin-gated) the actual $AXIS
+    // payment is deferred to approval time, not committed at application
+    // time. Agent stays instant since it's ungated either way.
+    if (requestedRole === "AGENT") {
+      const payment = await payMintWithAxis(user.id, "AGENT");
+      if (!payment.ok) return { error: payment.error };
+
+      await prisma.$transaction(async (tx) => {
+        await tx.roleApplication.create({
+          data: {
+            userId: user.id,
+            requestedRole: "AGENT",
+            paymentMethod: "AXIS",
+            status: "APPROVED",
+            reviewedAt: new Date(),
+          },
+        });
+        await grantMembershipCore(tx, user.id, "AGENT", null);
       });
-      await tx.walletLedgerEntry.create({
-        data: { userId: user.id, delta: -price, reason: "AGENT_MEMBERSHIP", refId: application.id },
+    } else {
+      const balance = await getAxisVestingBalance(user.id);
+      if (balance < MINT_PRICE_AXIS.AGENCY) {
+        return { error: `You need ${MINT_PRICE_AXIS.AGENCY.toLocaleString()} $AXIS. You have ${balance.toLocaleString()}.` };
+      }
+      await prisma.roleApplication.create({
+        data: { userId: user.id, requestedRole: "AGENCY", agencyName, paymentMethod: "AXIS" },
       });
-      await grantMembership(tx, user.id, "AGENT", null);
-    });
+    }
   } else {
-    // Fee is committed now; refunded automatically if an admin rejects.
-    await prisma.$transaction(async (tx) => {
-      const application = await tx.roleApplication.create({
-        data: { userId: user.id, requestedRole: "AGENCY", agencyName },
+    const balance = await getWalletBalance(user.id);
+    if (balance < price) {
+      return { error: `You need $${price.toLocaleString()} in your wallet. Top up and try again.` };
+    }
+
+    if (requestedRole === "AGENT") {
+      // Deducted and activated instantly — no admin gate.
+      await prisma.$transaction(async (tx) => {
+        const application = await tx.roleApplication.create({
+          data: { userId: user.id, requestedRole: "AGENT", status: "APPROVED", reviewedAt: new Date() },
+        });
+        await tx.walletLedgerEntry.create({
+          data: { userId: user.id, delta: -price, reason: "AGENT_MEMBERSHIP", refId: application.id },
+        });
+        await grantMembership(tx, user.id, "AGENT", null);
       });
-      await tx.walletLedgerEntry.create({
-        data: { userId: user.id, delta: -price, reason: "AGENCY_MEMBERSHIP", refId: application.id },
+    } else {
+      // Fee is committed now; refunded automatically if an admin rejects.
+      await prisma.$transaction(async (tx) => {
+        const application = await tx.roleApplication.create({
+          data: { userId: user.id, requestedRole: "AGENCY", agencyName },
+        });
+        await tx.walletLedgerEntry.create({
+          data: { userId: user.id, delta: -price, reason: "AGENCY_MEMBERSHIP", refId: application.id },
+        });
       });
-    });
+    }
   }
 
   revalidatePath("/profile");
@@ -156,6 +203,18 @@ export async function reviewRoleApplication(applicationId: string, approve: bool
   if (!application || application.status !== "PENDING") return { error: "Application not found or already reviewed." };
 
   if (!approve) {
+    // Nothing was ever deducted for the $AXIS path at application time
+    // (deferred to approval, see applyForRole), so there's nothing to
+    // refund there — only the WALLET path commits a fee upfront.
+    if (application.paymentMethod === "AXIS") {
+      await prisma.roleApplication.update({
+        where: { id: applicationId },
+        data: { status: "REJECTED", reviewedById: admin.id, reviewedAt: new Date() },
+      });
+      revalidatePath("/admin/users");
+      return undefined;
+    }
+
     const price = MEMBERSHIP_PRICE_USDT[application.requestedRole as "AGENT" | "AGENCY"];
     await prisma.$transaction([
       prisma.roleApplication.update({
@@ -173,6 +232,26 @@ export async function reviewRoleApplication(applicationId: string, approve: bool
     ]);
     revalidatePath("/admin/users");
     revalidatePath("/wallet");
+    return undefined;
+  }
+
+  if (application.paymentMethod === "AXIS") {
+    const payment = await payMintWithAxis(application.userId, application.requestedRole as "AGENT" | "AGENCY");
+    if (!payment.ok) return { error: payment.error };
+
+    await prisma.$transaction(async (tx) => {
+      await tx.roleApplication.update({
+        where: { id: applicationId },
+        data: { status: "APPROVED", reviewedById: admin.id, reviewedAt: new Date() },
+      });
+      await grantMembershipCore(
+        tx,
+        application.userId,
+        application.requestedRole as "AGENT" | "AGENCY",
+        application.agencyName
+      );
+    });
+    revalidatePath("/admin/users");
     return undefined;
   }
 

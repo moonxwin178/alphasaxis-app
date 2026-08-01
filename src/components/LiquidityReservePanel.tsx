@@ -3,7 +3,15 @@
 import { useState, useTransition } from "react";
 import { logNodeSaleLiquidityContribution } from "@/app/actions/admin";
 
-export function LiquidityReservePanel({ balance }: { balance: number }) {
+export function LiquidityReservePanel({
+  balance,
+  axisReserveBalance,
+  axisBurned,
+}: {
+  balance: number;
+  axisReserveBalance: number;
+  axisBurned: number;
+}) {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
@@ -13,8 +21,9 @@ export function LiquidityReservePanel({ balance }: { balance: number }) {
     <div className="card">
       <p className="row-title mb-1">Liquidity reserve</p>
       <p className="row-sub mb-2">
-        ${balance.toLocaleString()} accumulated — dedicated to seeding $AXIS/USDT and $AXIS/PLS DEX pools, kept
-        separate from general treasury.
+        ${balance.toLocaleString()} USD accumulated (mint fees + node sale) · {axisReserveBalance.toLocaleString()}{" "}
+        $AXIS reserved from mint-cycling · {axisBurned.toLocaleString()} $AXIS burned forever — all dedicated to
+        seeding $AXIS/USDT and $AXIS/PLS DEX pools, kept separate from general treasury.
       </p>
 
       <p className="eyebrow mb-1">Log a node-sale proceeds contribution</p>
