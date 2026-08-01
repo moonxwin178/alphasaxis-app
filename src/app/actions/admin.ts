@@ -221,6 +221,25 @@ export async function reviewKyc(kycSubmissionId: string, approve: boolean): Prom
   return undefined;
 }
 
+/** Approving flips tier to ADVANCED, unlocking the higher deposit quota + earn-rate boost. */
+export async function reviewKycAdvanced(kycSubmissionId: string, approve: boolean): Promise<AdminFormState> {
+  const admin = await requireRole("ADMIN");
+  const prisma = getPrisma();
+
+  await prisma.kycSubmission.update({
+    where: { id: kycSubmissionId },
+    data: {
+      advancedStatus: approve ? "VERIFIED" : "MISMATCH",
+      tier: approve ? "ADVANCED" : undefined,
+      advancedReviewedById: admin.id,
+      advancedReviewedAt: new Date(),
+    },
+  });
+
+  revalidatePath("/admin/users");
+  return undefined;
+}
+
 export async function approveCommission(lineItemId: string): Promise<AdminFormState> {
   const admin = await requireRole("ADMIN");
   const prisma = getPrisma();
@@ -583,10 +602,20 @@ export async function updateMiningConfig(_prevState: AdminFormState, formData: F
     percentValues[field] = raw / 100;
   }
 
+  const boostFields = ["advancedKycQuotaBoost", "advancedKycEarnBoost"] as const;
+  const boostValues: Record<(typeof boostFields)[number], number> = {} as never;
+  for (const field of boostFields) {
+    const raw = Number(formData.get(field));
+    if (!Number.isFinite(raw) || raw < 0) {
+      return { error: `Enter a valid boost percentage for ${field}.` };
+    }
+    boostValues[field] = 1 + raw / 100;
+  }
+
   const existing = await getMiningConfig();
   await prisma.axisMiningConfig.update({
     where: { id: existing.id },
-    data: { fxRateRmPerUsd, halvingMilestoneMiners, ...percentValues },
+    data: { fxRateRmPerUsd, halvingMilestoneMiners, ...percentValues, ...boostValues },
   });
 
   revalidatePath("/admin/mining");

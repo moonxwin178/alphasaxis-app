@@ -26,6 +26,23 @@ enum KycStatus {
   MISMATCH
 }
 
+// Standard = NRIC/passport + identity number only, enough to unlock
+// consultations/payouts/minting. Advanced = additionally verified selfie
+// (live capture) + proof of address, and is what unlocks the richer
+// Agent2Mine benefits (higher deposit quotas, an earn-rate boost) — see
+// ADVANCED_KYC_QUOTA_BOOST / ADVANCED_KYC_EARN_BOOST in miningConfig.ts.
+enum KycTier {
+  STANDARD
+  ADVANCED
+}
+
+enum KycAdvancedStatus {
+  NOT_SUBMITTED
+  PENDING
+  VERIFIED
+  MISMATCH
+}
+
 enum KycDocType {
   NRIC_PASSPORT
   SELFIE
@@ -188,6 +205,7 @@ model User {
   documents       Document[]           @relation("DocumentUploader")
   reviewedDocs    Document[]           @relation("DocumentReviewer")
   reviewedKyc     KycSubmission[]      @relation("KycReviewer")
+  reviewedKycAdvanced KycSubmission[]  @relation("KycAdvancedReviewer")
   pointsLedger    PointsLedgerEntry[]
   receiptUploads  ReceiptUpload[]
   checkIns        CheckIn[]
@@ -290,6 +308,18 @@ model KycSubmission {
   rejectionReason String?
   submittedAt    DateTime?
   createdAt      DateTime      @default(now())
+
+  // Advanced tier — a separate optional upgrade on top of the base
+  // Standard verification above, reusing the same SELFIE/PROOF_OF_ADDRESS
+  // KycDocument rows. Tracked independently since a user's base status can
+  // already be VERIFIED long before (or without ever) requesting Advanced.
+  tier                 KycTier           @default(STANDARD)
+  advancedStatus       KycAdvancedStatus @default(NOT_SUBMITTED)
+  advancedSubmittedAt  DateTime?
+  advancedReviewedById String?
+  advancedReviewer     User?             @relation("KycAdvancedReviewer", fields: [advancedReviewedById], references: [id])
+  advancedReviewedAt   DateTime?
+  advancedRejectionReason String?
 
   documents KycDocument[]
 }
@@ -1052,6 +1082,12 @@ model AxisMiningConfig {
   lockOneYearPayoutPct   Float    @default(0.50)
   lockTwoYearPayoutPct   Float    @default(0.70)
   lockThreeYearPayoutPct Float    @default(1.00)
+  // Advanced KYC benefits (selfie + proof of address verified on top of
+  // the base NRIC/passport tier) — multiplicative boosts applied in
+  // miningPool.ts's checkDepositQuota (RM deposit quota) and
+  // mineOutForTask (per-task $AXIS mine-out rate). 1.5 = +50%.
+  advancedKycQuotaBoost  Float    @default(1.5)
+  advancedKycEarnBoost   Float    @default(1.25)
   updatedAt              DateTime @updatedAt
 }
 

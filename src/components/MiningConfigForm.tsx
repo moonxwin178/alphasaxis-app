@@ -16,6 +16,8 @@ export interface MiningConfigValues {
   lockOneYearPayoutPct: number;
   lockTwoYearPayoutPct: number;
   lockThreeYearPayoutPct: number;
+  advancedKycQuotaBoost: number;
+  advancedKycEarnBoost: number;
 }
 
 function PercentField({ name, label, defaultValue, hint }: { name: string; label: string; defaultValue: number; hint?: string }) {
@@ -30,6 +32,25 @@ function PercentField({ name, label, defaultValue, hint }: { name: string; label
         min="0"
         max="100"
         defaultValue={(defaultValue * 100).toString()}
+        required
+      />
+      {hint && <p className="p-note !mb-0">{hint}</p>}
+    </div>
+  );
+}
+
+/** Multiplier fields (e.g. 1.5x = "+50%"), distinct from PercentField's plain 0-1 fraction fields above. */
+function BoostField({ name, label, defaultValue, hint }: { name: string; label: string; defaultValue: number; hint?: string }) {
+  return (
+    <div className="field">
+      <label htmlFor={name}>{label}</label>
+      <input
+        id={name}
+        name={name}
+        type="number"
+        step="1"
+        min="0"
+        defaultValue={((defaultValue - 1) * 100).toString()}
         required
       />
       {hint && <p className="p-note !mb-0">{hint}</p>}
@@ -107,6 +128,20 @@ export function MiningConfigForm({ config }: { config: MiningConfigValues }) {
       <PercentField name="lockOneYearPayoutPct" label="1 year (%)" defaultValue={config.lockOneYearPayoutPct} />
       <PercentField name="lockTwoYearPayoutPct" label="2 years (%)" defaultValue={config.lockTwoYearPayoutPct} />
       <PercentField name="lockThreeYearPayoutPct" label="3 years (%)" defaultValue={config.lockThreeYearPayoutPct} />
+
+      <p className="eyebrow mb-1 mt-2">Advanced KYC benefits</p>
+      <BoostField
+        name="advancedKycQuotaBoost"
+        label="Deposit quota boost (%)"
+        defaultValue={config.advancedKycQuotaBoost}
+        hint="Extra Spend-to-Earn deposit quota on top of the base tier, e.g. 50 = +50%."
+      />
+      <BoostField
+        name="advancedKycEarnBoost"
+        label="$AXIS earn-rate boost (%)"
+        defaultValue={config.advancedKycEarnBoost}
+        hint="Extra $AXIS mined per task on top of the base tier."
+      />
 
       {state?.error && <p className="mb-2 text-[11px] font-semibold text-red-400">{state.error}</p>}
       <button className="btn secondary" type="submit" disabled={pending}>

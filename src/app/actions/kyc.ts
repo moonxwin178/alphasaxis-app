@@ -99,6 +99,7 @@ export async function uploadKycDocument(
   return undefined;
 }
 
+/** Standard verification — NRIC/passport + identity number only. Enough to unlock consultations, payouts, and NFT minting. */
 export async function submitKycForReview(_formData: FormData): Promise<KycFormState> {
   const user = await requireUser();
   const prisma = getPrisma();
@@ -108,8 +109,8 @@ export async function submitKycForReview(_formData: FormData): Promise<KycFormSt
     include: { documents: true },
   });
 
-  if (!submission || submission.documents.length < DOC_TYPES.length) {
-    return { error: "Please upload all 3 documents before submitting." };
+  if (!submission || !submission.documents.some((d) => d.docType === "NRIC_PASSPORT")) {
+    return { error: "Please upload your NRIC/passport before submitting." };
   }
   if (!submission.identityNumber) {
     return { error: "Please enter your NRIC/passport number before submitting." };
@@ -121,4 +122,36 @@ export async function submitKycForReview(_formData: FormData): Promise<KycFormSt
   });
 
   redirect("/cases");
+}
+
+/**
+ * Advanced verification — selfie (live capture) + proof of address, on top
+ * of an already-VERIFIED Standard base. Unlocks higher Agent2Mine deposit
+ * quotas and a boosted earn rate (see advancedKycQuotaBoost/EarnBoost in
+ * AxisMiningConfig, applied in miningPool.ts).
+ */
+export async function submitAdvancedKyc(_formData: FormData): Promise<KycFormState> {
+  const user = await requireUser();
+  const prisma = getPrisma();
+
+  const submission = await prisma.kycSubmission.findUnique({
+    where: { userId: user.id },
+    include: { documents: true },
+  });
+
+  if (!submission || submission.status !== "VERIFIED") {
+    return { error: "Complete Standard verification first." };
+  }
+  const hasSelfie = submission.documents.some((d) => d.docType === "SELFIE");
+  const hasAddress = submission.documents.some((d) => d.docType === "PROOF_OF_ADDRESS");
+  if (!hasSelfie || !hasAddress) {
+    return { error: "Please upload both your live selfie and proof of address." };
+  }
+
+  await prisma.kycSubmission.update({
+    where: { id: submission.id },
+    data: { advancedStatus: "PENDING", advancedSubmittedAt: new Date() },
+  });
+
+  return undefined;
 }

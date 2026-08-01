@@ -1,20 +1,23 @@
 "use client";
 
 import { useTransition } from "react";
-import { reviewKyc } from "@/app/actions/admin";
+import { reviewKyc, reviewKycAdvanced } from "@/app/actions/admin";
 
 export function AdminKycRow({
   submissionId,
   name,
   email,
   documents,
+  kind = "standard",
 }: {
   submissionId: string;
   name: string;
   email: string;
   documents: { id: string; docType: string }[];
+  kind?: "standard" | "advanced";
 }) {
   const [pending, startTransition] = useTransition();
+  const review = kind === "advanced" ? reviewKycAdvanced : reviewKyc;
 
   return (
     <>
@@ -26,7 +29,10 @@ export function AdminKycRow({
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="row-title">{name}</p>
+          <p className="row-title">
+            {name}
+            {kind === "advanced" && <span className="badge gold ml-1.5">Advanced</span>}
+          </p>
           <p className="row-sub">
             {email} · {documents.length} documents
           </p>
@@ -50,7 +56,7 @@ export function AdminKycRow({
           className="btn ghost"
           style={{ fontSize: "11.5px", padding: 8 }}
           disabled={pending}
-          onClick={() => startTransition(() => { void reviewKyc(submissionId, true); })}
+          onClick={() => startTransition(() => { void review(submissionId, true); })}
         >
           Approve
         </button>
@@ -58,7 +64,7 @@ export function AdminKycRow({
           className="btn ghost"
           style={{ fontSize: "11.5px", padding: 8, color: "var(--red)" }}
           disabled={pending}
-          onClick={() => startTransition(() => { void reviewKyc(submissionId, false); })}
+          onClick={() => startTransition(() => { void review(submissionId, false); })}
         >
           Reject
         </button>

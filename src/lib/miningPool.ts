@@ -2,9 +2,17 @@ import "server-only";
 import { getPrisma } from "./prisma";
 import { getEmissionSnapshot } from "./axisEmission";
 import { getMiningPowerMultiplier } from "./miningPowerMultiplier";
+import { getMiningConfig } from "./miningConfig";
 import { resolveMiningTier } from "./commissionResolve";
 import { TIER_QUOTA, type TierQuota } from "./miningQuota";
 import type { AxisMiningTaskType } from "@/generated/prisma/client";
+
+/** Advanced KYC (selfie + proof of address on top of Standard) unlocks a higher deposit quota + earn-rate boost — see AxisMiningConfig. */
+async function isAdvancedKyc(userId: string): Promise<boolean> {
+  const prisma = getPrisma();
+  const kyc = await prisma.kycSubmission.findUnique({ where: { userId }, select: { tier: true } });
+  return kyc?.tier === "ADVANCED";
+}
 
 /** Current unmined backlog — a permanent claim, no expiry, only extractable by completing tasks. */
 export async function getMiningPoolBalance(userId: string): Promise<number> {
@@ -42,12 +50,17 @@ export async function checkDepositQuota(
   now: Date = new Date()
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const prisma = getPrisma();
-  const tier = await resolveMiningTier(userId);
+  const [tier, advanced, config] = await Promise.all([
+    resolveMiningTier(userId),
+    isAdvancedKyc(userId),
+    getMiningConfig(),
+  ]);
   const quota: TierQuota = TIER_QUOTA[tier];
+  const boost = advanced ? config.advancedKycQuotaBoost : 1;
 
   const field = category === "PETROL_RECEIPT" ? "subsidyAmountRm" : "adSpendRm";
-  const weeklyLimit = category === "PETROL_RECEIPT" ? quota.petrolWeeklyRm : quota.adsWeeklyRm;
-  const monthlyLimit = category === "PETROL_RECEIPT" ? quota.petrolMonthlyRm : quota.adsMonthlyRm;
+  const weeklyLimit = (category === "PETROL_RECEIPT" ? quota.petrolWeeklyRm : quota.adsWeeklyRm) * boost;
+  const monthlyLimit = (category === "PETROL_RECEIPT" ? quota.petrolMonthlyRm : quota.adsMonthlyRm) * boost;
 
   const [weekAgg, monthAgg] = await Promise.all([
     prisma.axisMiningSubmission.aggregate({
@@ -64,10 +77,10 @@ export async function checkDepositQuota(
   const monthUsed = Number((monthAgg._sum as Record<string, unknown>)[field] ?? 0);
 
   if (weekUsed + depositValueRm > weeklyLimit) {
-    return { ok: false, error: `Weekly quota reached (RM${weeklyLimit} max) — try again next week.` };
+    return { ok: false, error: `Weekly quota reached (RM${weeklyLimit.toFixed(2)} max) — try again next week.` };
   }
   if (monthUsed + depositValueRm > monthlyLimit) {
-    return { ok: false, error: `Monthly quota reached (RM${monthlyLimit} max) — try again next month.` };
+    return { ok: false, error: `Monthly quota reached (RM${monthlyLimit.toFixed(2)} max) — try again next month.` };
   }
   return { ok: true };
 }
@@ -99,14 +112,17 @@ export async function mineOutForTask(userId: string): Promise<number> {
   const poolBalance = await getMiningPoolBalance(userId);
   if (poolBalance <= 0) return 0;
 
-  const [tier, mpm, snapshot] = await Promise.all([
+  const [tier, mpm, snapshot, advanced, config] = await Promise.all([
     resolveMiningTier(userId),
     getMiningPowerMultiplier(userId),
     getEmissionSnapshot(),
+    isAdvancedKyc(userId),
+    getMiningConfig(),
   ]);
   if (!snapshot) return 0;
 
-  const monthlyCap = snapshot.capByTier[tier] * mpm;
+  const earnBoost = advanced ? config.advancedKycEarnBoost : 1;
+  const monthlyCap = snapshot.capByTier[tier] * mpm * earnBoost;
   const weeklyCap = monthlyCap * MONTHLY_TO_WEEKLY_RATE;
   const yearlyCap = monthlyCap * MONTHLY_TO_YEARLY_MULTIPLE;
   const perTaskUnlock = monthlyCap / 30;

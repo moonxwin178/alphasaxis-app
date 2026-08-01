@@ -18,11 +18,17 @@ export default async function AdminUsersPage() {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
-  const [submissions, roleApplications, topUpRequests] = await Promise.all([
+  const [submissions, advancedSubmissions, roleApplications, topUpRequests] = await Promise.all([
     prisma.kycSubmission.findMany({
       where: { status: { in: ["PENDING", "VERIFIED", "MISMATCH"] } },
       include: { user: { select: { name: true, email: true } }, documents: true },
       orderBy: { submittedAt: "desc" },
+      take: 30,
+    }),
+    prisma.kycSubmission.findMany({
+      where: { advancedStatus: "PENDING" },
+      include: { user: { select: { name: true, email: true } }, documents: true },
+      orderBy: { advancedSubmittedAt: "desc" },
       take: 30,
     }),
     prisma.roleApplication.findMany({
@@ -100,6 +106,24 @@ export default async function AdminUsersPage() {
           </>
         )}
 
+        {advancedSubmissions.length > 0 && (
+          <>
+            <p className="eyebrow mt-2">Advanced KYC review</p>
+            {advancedSubmissions.map((s) => (
+              <AdminKycRow
+                key={s.id}
+                submissionId={s.id}
+                name={s.user.name}
+                email={s.user.email}
+                documents={s.documents
+                  .filter((d) => d.docType === "SELFIE" || d.docType === "PROOF_OF_ADDRESS")
+                  .map((d) => ({ id: d.id, docType: d.docType }))}
+                kind="advanced"
+              />
+            ))}
+          </>
+        )}
+
         <p className="eyebrow mt-2">Identity verification</p>
         {submissions.length === 0 && <p className="p-note">No KYC submissions yet.</p>}
         {submissions.map((s) =>
@@ -120,7 +144,10 @@ export default async function AdminUsersPage() {
                 </svg>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="row-title">{s.user.name}</p>
+                <p className="row-title">
+                  {s.user.name}
+                  {s.tier === "ADVANCED" && <span className="badge gold ml-1.5">Advanced</span>}
+                </p>
                 <p className="row-sub">{s.user.email}</p>
               </div>
               <div className="row-right" dangerouslySetInnerHTML={{ __html: STATUS_BADGE[s.status] ?? "" }} />
