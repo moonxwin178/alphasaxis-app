@@ -600,6 +600,33 @@ model Dispute {
   createdAt      DateTime      @default(now())
 }
 
+enum LiquidityReserveSource {
+  MINT_FEE_ALLOCATION
+  NODE_SALE_ALLOCATION
+  ADMIN_ADJUST
+}
+
+// Dedicated, disciplined war chest for eventual $AXIS/USDT and $AXIS/PLS DEX
+// liquidity — deliberately separate from general treasury so it isn't spent
+// on anything else. Two funding sources, per the confirmed plan: (1) an
+// automatic cut of every Agent/Agency mint fee, net of the 15% referral
+// payout, taken the moment a mint is granted (see grantMembership in
+// actions/roleApplication.ts); (2) a manually admin-logged share of the
+// AxisPrestige node-sale proceeds (that $500/node sale happens off-platform
+// on turbox.bond, so there's no in-app payment event to hook automatically —
+// an admin records it once the real off-platform figures are known).
+// Balance = SUM(amountUsd), same append-only ledger pattern as everything
+// else here.
+model LiquidityReserveEntry {
+  id          String                 @id @default(cuid())
+  amountUsd   Decimal                @db.Decimal(14, 2)
+  source      LiquidityReserveSource
+  refId       String?
+  note        String?
+  createdById String?
+  createdAt   DateTime               @default(now())
+}
+
 // ============================================================================
 // Agent2Mine — Spend-to-Earn $AXIS mining, separate from the gamified
 // PointsLedgerEntry system above. Real numbers confirmed: Agent2Mine

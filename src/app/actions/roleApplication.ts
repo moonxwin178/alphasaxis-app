@@ -6,6 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getWalletBalance } from "@/lib/wallet";
 import { TIER_MULTIPLIER } from "@/lib/commission";
 import { MEMBERSHIP_PRICE_USDT, REFERRAL_COMMISSION_RATE } from "@/lib/membership";
+import { MINT_FEE_LIQUIDITY_SHARE } from "@/lib/liquidityReserve";
 import type { NftTier, PrismaClient, Role } from "@/generated/prisma/client";
 
 export type RoleAppFormState = { error?: string } | undefined;
@@ -44,31 +45,51 @@ async function grantMembership(tx: Tx, userId: string, role: "AGENT" | "AGENCY",
 
   const buyer = await tx.user.findUnique({ where: { id: userId }, select: { referredById: true } });
   const mintPrice = MEMBERSHIP_PRICE_USDT[role];
+  let referralPaid = 0;
 
   if (buyer?.referredById) {
+    const tier1Amount = mintPrice * REFERRAL_COMMISSION_RATE.TIER_1;
+    referralPaid += tier1Amount;
     await tx.membershipCommission.create({
       data: {
         recipientId: buyer.referredById,
         sourceUserId: userId,
         mintedRole: role as Role,
         tier: "TIER_1",
-        usdtAmount: mintPrice * REFERRAL_COMMISSION_RATE.TIER_1,
+        usdtAmount: tier1Amount,
       },
     });
 
     const tier1 = await tx.user.findUnique({ where: { id: buyer.referredById }, select: { referredById: true } });
     if (tier1?.referredById) {
+      const tier2Amount = mintPrice * REFERRAL_COMMISSION_RATE.TIER_2;
+      referralPaid += tier2Amount;
       await tx.membershipCommission.create({
         data: {
           recipientId: tier1.referredById,
           sourceUserId: userId,
           mintedRole: role as Role,
           tier: "TIER_2",
-          usdtAmount: mintPrice * REFERRAL_COMMISSION_RATE.TIER_2,
+          usdtAmount: tier2Amount,
         },
       });
     }
   }
+
+  const netFee = mintPrice - referralPaid;
+  const liquidityContribution = netFee * MINT_FEE_LIQUIDITY_SHARE;
+  if (liquidityContribution > 0) {
+    await tx.liquidityReserveEntry.create({
+      data: {
+        amountUsd: liquidityContribution,
+        source: "MINT_FEE_ALLOCATION",
+        refId: userId,
+        note: `${MINT_FEE_LIQUIDITY_SHARE * 100}% of net ${role} mint fee`,
+      },
+    });
+  }
+
+  return { mintPrice, referralPaid };
 }
 
 export async function applyForRole(

@@ -7,12 +7,14 @@ import { RunVestingBatchButton } from "@/components/RunVestingBatchButton";
 import { AdminNodeVestingRow } from "@/components/AdminNodeVestingRow";
 import { getPrestigePoolBalance, getVerifiedPrestigeNodes } from "@/lib/axisPrestigeRevenue";
 import { computeVestedTokens, getRealizedValueTotal, EARLY_BACKERS_POOL_TOKENS } from "@/lib/axisPrestigeVesting";
+import { getLiquidityReserveBalance } from "@/lib/liquidityReserve";
+import { LiquidityReservePanel } from "@/components/LiquidityReservePanel";
 
 export default async function AdminAxisPrestigePage() {
   await requireRole("ADMIN");
   const prisma = getPrisma();
 
-  const [pendingClaims, poolBalance, verifiedNodes, nodeVestings] = await Promise.all([
+  const [pendingClaims, poolBalance, verifiedNodes, nodeVestings, liquidityBalance] = await Promise.all([
     prisma.nftHolding.findMany({
       where: { tier: "AXIS_PRESTIGE", verificationStatus: "PENDING" },
       include: { user: { select: { name: true } } },
@@ -24,6 +26,7 @@ export default async function AdminAxisPrestigePage() {
       include: { user: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     }),
+    getLiquidityReserveBalance(),
   ]);
 
   const now = new Date();
@@ -58,6 +61,9 @@ export default async function AdminAxisPrestigePage() {
             ))}
           </>
         )}
+
+        <p className="eyebrow mt-2">Liquidity</p>
+        <LiquidityReservePanel balance={liquidityBalance} />
 
         <p className="eyebrow mt-2">Revenue share (USD/USDT)</p>
         <AxisPrestigePoolPanel poolBalance={poolBalance} nodeCount={verifiedNodes.length} />

@@ -14,6 +14,7 @@ import { EMAIL_PATTERN, stripControlChars } from "@/lib/apiSecurity";
 import { getEmissionSnapshot, type MiningTier } from "@/lib/axisEmission";
 import { createNodeVesting, runVestingBatch } from "@/lib/axisPrestigeVesting";
 import { contributeToPrestigePool, runRevenueDistribution } from "@/lib/axisPrestigeRevenue";
+import { contributeNodeSaleShare } from "@/lib/liquidityReserve";
 import type { AxisRealizedValueSource } from "@/generated/prisma/client";
 
 export type AdminFormState = { error?: string } | undefined;
@@ -472,5 +473,22 @@ export async function reviewCase(caseId: string, action: "approve" | "flag"): Pr
   ]);
 
   revalidatePath("/admin/cases");
+  return undefined;
+}
+
+/**
+ * Logs a real-world AxisPrestige node-sale proceeds contribution to the
+ * Liquidity Reserve. The $500/node sale happens off-platform on
+ * turbox.bond, so there's no in-app payment to hook automatically — an
+ * admin enters the actual figure once it's known (e.g. 10-15% of proceeds
+ * from a completed sale round, per the confirmed plan).
+ */
+export async function logNodeSaleLiquidityContribution(amountUsd: number, note: string): Promise<AdminFormState> {
+  const admin = await requireRole("ADMIN");
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return { error: "Enter a valid amount." };
+
+  await contributeNodeSaleShare(amountUsd, stripControlChars(note).slice(0, 200) || "Node sale liquidity contribution", admin.id);
+
+  revalidatePath("/admin/axisprestige");
   return undefined;
 }
