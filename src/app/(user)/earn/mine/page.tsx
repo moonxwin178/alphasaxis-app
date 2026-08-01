@@ -6,14 +6,15 @@ import { MetaAdsOnboardingForm } from "@/components/MetaAdsOnboardingForm";
 import { getAxisVestingBalance } from "@/lib/axisEmission";
 import { getMiningPoolBalance } from "@/lib/miningPool";
 import { getMiningPowerMultiplier } from "@/lib/miningPowerMultiplier";
+import { getMiningConfig } from "@/lib/miningConfig";
 import {
-  LOCK_TIER_CONFIG,
   getClaimableAxisBalance,
   getClaimVestingSchedules,
   getLiquidAxisBalance,
+  getLockTierOptions,
   runClaimVestingBatch,
 } from "@/lib/axisClaimVesting";
-import { ClaimVestingPanel, type LockTierOption } from "@/components/ClaimVestingPanel";
+import { ClaimVestingPanel } from "@/components/ClaimVestingPanel";
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: '<span class="badge amber">Review</span>',
@@ -33,19 +34,18 @@ export default async function EarnMinePage() {
 
   await runClaimVestingBatch(user.id);
 
-  const [minedBalance, poolBalance, mpm, submissions, claimableBalance, liquidBalance, schedules] = await Promise.all([
-    getAxisVestingBalance(user.id, "AGENT2MINE_TASK"),
-    getMiningPoolBalance(user.id),
-    getMiningPowerMultiplier(user.id),
-    prisma.axisMiningSubmission.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
-    getClaimableAxisBalance(user.id),
-    getLiquidAxisBalance(user.id),
-    getClaimVestingSchedules(user.id),
-  ]);
-
-  const lockTiers: LockTierOption[] = (
-    ["SIX_MONTH", "ONE_YEAR", "TWO_YEAR", "THREE_YEAR"] as const
-  ).map((tier) => ({ tier, ...LOCK_TIER_CONFIG[tier] }));
+  const [minedBalance, poolBalance, mpm, submissions, claimableBalance, liquidBalance, schedules, lockTiers, config] =
+    await Promise.all([
+      getAxisVestingBalance(user.id, "AGENT2MINE_TASK"),
+      getMiningPoolBalance(user.id),
+      getMiningPowerMultiplier(user.id),
+      prisma.axisMiningSubmission.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
+      getClaimableAxisBalance(user.id),
+      getLiquidAxisBalance(user.id),
+      getClaimVestingSchedules(user.id),
+      getLockTierOptions(),
+      getMiningConfig(),
+    ]);
 
   return (
     <div>
@@ -88,7 +88,7 @@ export default async function EarnMinePage() {
         />
 
         <PetrolReceiptForm />
-        <MetaAdsOnboardingForm />
+        <MetaAdsOnboardingForm adsDepositRate={config.adsDepositRate} />
 
         <div>
           <p className="eyebrow">Your submissions</p>

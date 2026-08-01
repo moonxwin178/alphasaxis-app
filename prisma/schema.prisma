@@ -990,11 +990,26 @@ model MiningPoolLedgerEntry {
 // by policy announcement — see the fact-check flag on this) and the RM/USD
 // FX rate used to convert RM deposit values into $AXIS at the pool's
 // $0.0005 anchor. One live row; admin updates it in place.
+// Single-row, admin-editable config for every tokenomics knob that started
+// life as a hardcoded constant — see src/lib/miningConfig.ts. Values here
+// only affect NEW calculations going forward (halving epoch, MPM, mint
+// splits, lock-tier claims) — never retroactively rewritten into ledger
+// rows or vesting schedules already created under the old numbers.
 model AxisMiningConfig {
-  id                String   @id @default(cuid())
-  petrolSubsidyRate Float    @default(0.40)
-  fxRateRmPerUsd    Float    @default(4.76)
-  updatedAt         DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  petrolSubsidyRate      Float    @default(0.40)
+  fxRateRmPerUsd         Float    @default(4.76)
+  halvingMilestoneMiners Int      @default(17800)
+  mpmBonusPerTierWeight  Float    @default(0.02)
+  mpmCap                 Float    @default(0.5)
+  adsDepositRate         Float    @default(0.10)
+  mintBurnShare          Float    @default(0.425)
+  mintReserveShare       Float    @default(0.425)
+  lockSixMonthPayoutPct  Float    @default(0.30)
+  lockOneYearPayoutPct   Float    @default(0.50)
+  lockTwoYearPayoutPct   Float    @default(0.70)
+  lockThreeYearPayoutPct Float    @default(1.00)
+  updatedAt              DateTime @updatedAt
 }
 
 enum AesRevenueTarget {

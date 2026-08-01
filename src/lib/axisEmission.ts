@@ -1,5 +1,6 @@
 import "server-only";
 import { getPrisma } from "./prisma";
+import { getMiningConfig } from "./miningConfig";
 import type { AxisLedgerSource } from "@/generated/prisma/client";
 
 /**
@@ -45,12 +46,15 @@ export interface ActiveUserCount {
  * where BASE_MONTHLY_RATE is the pool's original month-1 rate (totalPool ÷ 60).
  * Asymptotic — mathematically never reaches exactly zero (same as Bitcoin's
  * satoshi tail), practically ~99.9% distributed by epoch 10.
+ *
+ * The 17,800 figure is the seeded default — admin-editable going forward via
+ * AxisMiningConfig.halvingMilestoneMiners (see /admin/mining settings).
  */
-export const HALVING_MILESTONE_MINERS = 17_800;
+export const HALVING_MILESTONE_MINERS_DEFAULT = 17_800;
 
 export async function getHalvingEpoch(): Promise<number> {
   const prisma = getPrisma();
-  const [taskMiners, depositMiners] = await Promise.all([
+  const [taskMiners, depositMiners, config] = await Promise.all([
     prisma.axisVestingLedgerEntry.findMany({
       where: { source: "AGENT2MINE_TASK" },
       distinct: ["userId"],
@@ -61,9 +65,10 @@ export async function getHalvingEpoch(): Promise<number> {
       distinct: ["userId"],
       select: { userId: true },
     }),
+    getMiningConfig(),
   ]);
   const cumulativeMiners = new Set([...taskMiners.map((m) => m.userId), ...depositMiners.map((m) => m.userId)]).size;
-  return Math.floor(cumulativeMiners / HALVING_MILESTONE_MINERS);
+  return Math.floor(cumulativeMiners / config.halvingMilestoneMiners);
 }
 
 /** Effective monthly budget at a given halving epoch — the pool's month-1 rate, halved once per epoch crossed. */
@@ -123,7 +128,7 @@ export async function getAxisVestingBalance(userId: string, source?: AxisLedgerS
 export async function getEmissionSnapshot() {
   const prisma = getPrisma();
 
-  const config = await getOrCreatePoolConfig();
+  const [config, economyConfig] = await Promise.all([getOrCreatePoolConfig(), getMiningConfig()]);
 
   const [awardedAgg, nftHoldings, halvingEpoch] = await Promise.all([
     prisma.axisVestingLedgerEntry.aggregate({
@@ -160,6 +165,7 @@ export async function getEmissionSnapshot() {
     totalPool,
     remainingPool,
     halvingEpoch,
+    halvingMilestoneMiners: economyConfig.halvingMilestoneMiners,
     monthlyEmissionBudget: budget,
     anchorPriceUsd: Number(config.anchorPriceUsd),
     activeUsers,

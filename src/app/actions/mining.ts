@@ -9,7 +9,6 @@ import { stripControlChars } from "@/lib/apiSecurity";
 import { isCountryAllowedForMining, ALLOWED_MINING_COUNTRIES } from "@/lib/regionGate";
 import { checkDepositQuota } from "@/lib/miningPool";
 import { getMiningConfig } from "@/lib/miningConfig";
-import { ADS_DEPOSIT_RATE } from "@/lib/miningQuota";
 import { claimToVesting, runClaimVestingBatch } from "@/lib/axisClaimVesting";
 import type { VestingLockTier } from "@/generated/prisma/client";
 
@@ -150,7 +149,8 @@ export async function submitMetaAdsOnboarding(
     return { error: "This spend isn't from this calendar month — only same-month spend is eligible." };
   }
 
-  const depositValueRm = Math.round(spendRm * ADS_DEPOSIT_RATE * 100) / 100;
+  const { adsDepositRate } = await getMiningConfig();
+  const depositValueRm = Math.round(spendRm * adsDepositRate * 100) / 100;
   const quota = await checkDepositQuota(user.id, "META_ADS_ONBOARDING", depositValueRm, now);
   if (!quota.ok) return { error: quota.error };
 

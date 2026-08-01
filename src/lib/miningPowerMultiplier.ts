@@ -1,5 +1,6 @@
 import "server-only";
 import { getPrisma } from "./prisma";
+import { getMiningConfig } from "./miningConfig";
 import { TIER_WEIGHT, type MiningTier } from "./axisEmission";
 
 /**
@@ -11,25 +12,27 @@ import { TIER_WEIGHT, type MiningTier } from "./axisEmission";
  *
  * Weighted by the referred user's own tier, so referring a paying
  * Agent/Agency counts for meaningfully more than referring a free AxisZero
- * signup: +2% × that referral's tier weight (0.5/1.5/2.0/3.0), capped at
- * +50% total (a zero-sum reallocation of the fixed pool, never new
- * inflation — safe regardless of how viral it gets).
+ * signup: bonusPerTierWeight × that referral's tier weight (0.5/1.5/2.0/3.0),
+ * capped at mpmCap total (a zero-sum reallocation of the fixed pool, never
+ * new inflation — safe regardless of how viral it gets). Both the per-tier
+ * bonus rate and the cap are admin-editable — see AxisMiningConfig.
  */
-const BONUS_PER_TIER_WEIGHT = 0.02;
-const MPM_CAP = 0.5;
 const ACTIVE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function getMiningPowerMultiplier(userId: string): Promise<number> {
   const prisma = getPrisma();
   const since = new Date(Date.now() - ACTIVE_WINDOW_MS);
 
-  const referrals = await prisma.user.findMany({
-    where: { referredById: userId },
-    select: {
-      id: true,
-      nftHoldings: { where: { verificationStatus: "VERIFIED" }, select: { tier: true, multiplier: true } },
-    },
-  });
+  const [referrals, config] = await Promise.all([
+    prisma.user.findMany({
+      where: { referredById: userId },
+      select: {
+        id: true,
+        nftHoldings: { where: { verificationStatus: "VERIFIED" }, select: { tier: true, multiplier: true } },
+      },
+    }),
+    getMiningConfig(),
+  ]);
 
   if (referrals.length === 0) return 1;
 
@@ -40,10 +43,10 @@ export async function getMiningPowerMultiplier(userId: string): Promise<number> 
 
     const bestTier = referral.nftHoldings.sort((a, b) => b.multiplier - a.multiplier)[0]?.tier as MiningTier | undefined;
     const tierWeight = bestTier ? (TIER_WEIGHT[bestTier] ?? TIER_WEIGHT.AXIS_ZERO) : TIER_WEIGHT.AXIS_ZERO;
-    bonus += BONUS_PER_TIER_WEIGHT * tierWeight;
+    bonus += config.mpmBonusPerTierWeight * tierWeight;
   }
 
-  return 1 + Math.min(MPM_CAP, bonus);
+  return 1 + Math.min(config.mpmCap, bonus);
 }
 
 async function isUserActiveSince(userId: string, since: Date): Promise<boolean> {

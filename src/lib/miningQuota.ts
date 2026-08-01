@@ -26,5 +26,6 @@ export const TIER_QUOTA: Record<Extract<NftTier, "AXIS_ZERO" | "AXIS_ONE" | "AXI
   AXIS_PRESTIGE: { petrolWeeklyRm: 240, petrolMonthlyRm: 960, adsWeeklyRm: 600, adsMonthlyRm: 2_400 },
 };
 
-/** Ads deposit value = 10% of verified ad spend. Petrol deposit value = the actual government subsidy amount (see AxisMiningConfig.petrolSubsidyRate, admin-editable). */
-export const ADS_DEPOSIT_RATE = 0.10;
+// Ads deposit value = AxisMiningConfig.adsDepositRate (admin-editable, default
+// 10%) of verified ad spend. Petrol deposit value = the actual government
+// subsidy amount (AxisMiningConfig.petrolSubsidyRate, also admin-editable).

@@ -2,11 +2,13 @@ import "server-only";
 import { getPrisma } from "./prisma";
 
 /**
- * Lazily-seeded config row for the two genuinely volatile, external numbers:
- * the government petrol subsidy rate (changes by policy announcement — we
- * could not verify Malaysia's current live rate, so this must stay
- * admin-editable, never hardcoded) and the RM/USD FX rate used to convert
- * deposit values into $AXIS at the pool's $0.0005 anchor.
+ * Lazily-seeded single-row config for every tokenomics knob an admin might
+ * need to tune post-launch: the genuinely volatile external numbers
+ * (government petrol subsidy rate, RM/USD FX rate), plus the business
+ * levers that started as hardcoded constants (halving milestone size, MPM
+ * bonus/cap, ads deposit rate, mint-cycling burn/reserve split, and the
+ * four vesting-lock payout percentages). Edited via the admin settings
+ * form on /admin/mining — see updateMiningConfig in actions/admin.ts.
  */
 export async function getMiningConfig() {
   const prisma = getPrisma();

@@ -19,7 +19,7 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function MetaAdsOnboardingForm() {
+export function MetaAdsOnboardingForm({ adsDepositRate }: { adsDepositRate: number }) {
   const [state, action, pending] = useActionState(submitMetaAdsOnboarding, undefined);
   const [connect, setConnect] = useState<ConnectState>("idle");
   const [category, setCategory] = useState<string>("");
@@ -83,7 +83,7 @@ export function MetaAdsOnboardingForm() {
         <div className="field">
           <label htmlFor="spendRm">Ad spend (RM)</label>
           <input id="spendRm" name="spendRm" type="number" step="0.01" min="0" required />
-          <p className="p-note !mb-0">10% of this deposits into your mining pool.</p>
+          <p className="p-note !mb-0">{Math.round(adsDepositRate * 100)}% of this deposits into your mining pool.</p>
         </div>
         <div className="field">
           <label htmlFor="proof">Screenshot of Meta Ads Manager spend</label>

@@ -5,7 +5,8 @@ import { AdminMiningRow } from "@/components/AdminMiningRow";
 import { AiVerificationPreview } from "@/components/AiVerificationPreview";
 import { resolveMiningTier } from "@/lib/commissionResolve";
 import { getMiningConfig } from "@/lib/miningConfig";
-import { getEmissionSnapshot, HALVING_MILESTONE_MINERS } from "@/lib/axisEmission";
+import { getEmissionSnapshot } from "@/lib/axisEmission";
+import { MiningConfigForm } from "@/components/MiningConfigForm";
 
 const TASK_LABEL: Record<string, string> = {
   PETROL_RECEIPT: "Petrol subsidy receipt",
@@ -38,19 +39,13 @@ export default async function AdminMiningPage() {
     <div>
       <AppHeader title="Agent2Mine Review" backHref="/admin/users" />
       <div className="px-4 pt-4">
-        <div className="card">
-          <p className="row-title mb-1">Mining config</p>
-          <p className="row-sub">
-            Petrol subsidy rate: {(config.petrolSubsidyRate * 100).toFixed(0)}% · FX: RM{config.fxRateRmPerUsd.toFixed(2)}
-            /USD — edit in code/DB as government policy or FX changes.
-          </p>
-        </div>
+        <MiningConfigForm config={config} />
 
         {snapshot && (
           <div className="card">
             <p className="row-title mb-1">Emission pool</p>
             <p className="row-sub">
-              Halving epoch {snapshot.halvingEpoch} ({HALVING_MILESTONE_MINERS.toLocaleString()} miners/halving) ·
+              Halving epoch {snapshot.halvingEpoch} ({snapshot.halvingMilestoneMiners.toLocaleString()} miners/halving) ·
               monthly budget {snapshot.monthlyEmissionBudget.toLocaleString(undefined, { maximumFractionDigits: 0 })}{" "}
               $AXIS · caps — Zero {snapshot.capByTier.AXIS_ZERO.toFixed(2)}, One {snapshot.capByTier.AXIS_ONE.toFixed(2)}
               , Pro {snapshot.capByTier.AXIS_PRO.toFixed(2)}, Prestige {snapshot.capByTier.AXIS_PRESTIGE.toFixed(2)}

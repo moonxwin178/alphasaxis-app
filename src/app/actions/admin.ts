@@ -540,3 +540,55 @@ export async function runAesPoolDistribution(target: AesRevenueTarget): Promise<
   revalidatePath("/admin/axisprestige");
   return undefined;
 }
+
+const PERCENT_FIELDS = [
+  "petrolSubsidyRate",
+  "mpmBonusPerTierWeight",
+  "mpmCap",
+  "adsDepositRate",
+  "mintBurnShare",
+  "mintReserveShare",
+  "lockSixMonthPayoutPct",
+  "lockOneYearPayoutPct",
+  "lockTwoYearPayoutPct",
+  "lockThreeYearPayoutPct",
+] as const;
+
+/**
+ * Updates the single-row AxisMiningConfig — every tokenomics knob an admin
+ * can tune post-launch without a code deploy. Percent fields arrive from
+ * the form as whole numbers (e.g. "42.5" for 42.5%) and are stored as
+ * fractions (0.425), matching how the rest of the codebase reads them.
+ * Only ever affects NEW calculations — nothing here rewrites ledger rows
+ * or vesting schedules already created under the prior numbers.
+ */
+export async function updateMiningConfig(_prevState: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  await requireRole("ADMIN");
+  const prisma = getPrisma();
+
+  const fxRateRmPerUsd = Number(formData.get("fxRateRmPerUsd"));
+  const halvingMilestoneMiners = Number(formData.get("halvingMilestoneMiners"));
+
+  if (!Number.isFinite(fxRateRmPerUsd) || fxRateRmPerUsd <= 0) return { error: "Enter a valid FX rate." };
+  if (!Number.isInteger(halvingMilestoneMiners) || halvingMilestoneMiners <= 0) {
+    return { error: "Halving milestone must be a positive whole number of miners." };
+  }
+
+  const percentValues: Record<(typeof PERCENT_FIELDS)[number], number> = {} as never;
+  for (const field of PERCENT_FIELDS) {
+    const raw = Number(formData.get(field));
+    if (!Number.isFinite(raw) || raw < 0 || raw > 100) {
+      return { error: `Enter a valid percentage (0–100) for ${field}.` };
+    }
+    percentValues[field] = raw / 100;
+  }
+
+  const existing = await getMiningConfig();
+  await prisma.axisMiningConfig.update({
+    where: { id: existing.id },
+    data: { fxRateRmPerUsd, halvingMilestoneMiners, ...percentValues },
+  });
+
+  revalidatePath("/admin/mining");
+  return undefined;
+}

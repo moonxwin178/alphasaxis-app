@@ -3,6 +3,7 @@ import { getPrisma } from "./prisma";
 import { getLiquidAxisBalance } from "./axisClaimVesting";
 import { REFERRAL_COMMISSION_RATE } from "./membership";
 import { MINT_PRICE_AXIS } from "./mintPricing";
+import { getMiningConfig } from "./miningConfig";
 import type { Role } from "@/generated/prisma/client";
 
 export { MINT_PRICE_AXIS } from "./mintPricing";
@@ -12,14 +13,12 @@ export { MINT_PRICE_AXIS } from "./mintPricing";
  * mint fee in $AXIS instead of USDT, priced at the same $0.0005 anchor the
  * whole Agent2Mine pool is denominated in. Referral on this path is paid
  * IN $AXIS (same 10%/5% tier structure as the USDT path), so the value
- * never leaves the ecosystem. The remainder splits 42.5% burned (destroyed
- * forever) / 42.5% into the $AXIS Liquidity Reserve — this is the real
- * anti-dump sink: every mint-cycled token either gets destroyed or stays
- * circulating internally, never becomes new sell-pressure float.
+ * never leaves the ecosystem. The remainder splits burn (destroyed forever)
+ * / reserve (the $AXIS Liquidity Reserve) — admin-editable shares, default
+ * 42.5%/42.5% — this is the real anti-dump sink: every mint-cycled token
+ * either gets destroyed or stays circulating internally, never becomes new
+ * sell-pressure float.
  */
-const BURN_SHARE = 0.425;
-const RESERVE_SHARE = 0.425;
-
 export interface MintCyclePaymentResult {
   ok: boolean;
   error?: string;
@@ -58,9 +57,10 @@ export async function payMintWithAxis(userId: string, role: "AGENT" | "AGENCY"):
     }
   }
 
+  const config = await getMiningConfig();
   const netAfterReferral = price - referralPaid;
-  const burnAmount = netAfterReferral * BURN_SHARE;
-  const reserveAmount = netAfterReferral * RESERVE_SHARE;
+  const burnAmount = netAfterReferral * config.mintBurnShare;
+  const reserveAmount = netAfterReferral * config.mintReserveShare;
 
   await prisma.$transaction([
     prisma.axisVestingLedgerEntry.create({

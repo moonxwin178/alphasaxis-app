@@ -1,6 +1,7 @@
 import "server-only";
 import { getPrisma } from "./prisma";
 import { getMiningPowerMultiplier } from "./miningPowerMultiplier";
+import { getMiningConfig } from "./miningConfig";
 import type { VestingLockTier } from "@/generated/prisma/client";
 
 /**
@@ -10,14 +11,39 @@ import type { VestingLockTier } from "@/generated/prisma/client";
  * actually get spendable $AXIS, a user locks a slice of their claimable
  * balance into one of these four fixed terms; longer locks release a higher
  * % of the locked amount, and a user's current Mining Power Multiplier
- * boosts that % further (capped at 100% — never above 1:1).
+ * boosts that % further (capped at 100% — never above 1:1). Term lengths
+ * are structural (fixed); the payout % per term is admin-editable — see
+ * AxisMiningConfig.lock*PayoutPct and getLockTierOptions() below.
  */
-export const LOCK_TIER_CONFIG: Record<VestingLockTier, { months: number; basePayoutPct: number; label: string }> = {
-  SIX_MONTH: { months: 6, basePayoutPct: 0.3, label: "6 months" },
-  ONE_YEAR: { months: 12, basePayoutPct: 0.5, label: "1 year" },
-  TWO_YEAR: { months: 24, basePayoutPct: 0.7, label: "2 years" },
-  THREE_YEAR: { months: 36, basePayoutPct: 1.0, label: "3 years" },
+export const LOCK_TIER_MONTHS: Record<VestingLockTier, { months: number; label: string }> = {
+  SIX_MONTH: { months: 6, label: "6 months" },
+  ONE_YEAR: { months: 12, label: "1 year" },
+  TWO_YEAR: { months: 24, label: "2 years" },
+  THREE_YEAR: { months: 36, label: "3 years" },
 };
+
+export interface LockTierOption {
+  tier: VestingLockTier;
+  months: number;
+  label: string;
+  basePayoutPct: number;
+}
+
+/** Live lock-tier menu — term lengths are fixed, payout % comes from the admin-editable config. */
+export async function getLockTierOptions(): Promise<LockTierOption[]> {
+  const config = await getMiningConfig();
+  const payoutPctByTier: Record<VestingLockTier, number> = {
+    SIX_MONTH: config.lockSixMonthPayoutPct,
+    ONE_YEAR: config.lockOneYearPayoutPct,
+    TWO_YEAR: config.lockTwoYearPayoutPct,
+    THREE_YEAR: config.lockThreeYearPayoutPct,
+  };
+  return (Object.keys(LOCK_TIER_MONTHS) as VestingLockTier[]).map((tier) => ({
+    tier,
+    ...LOCK_TIER_MONTHS[tier],
+    basePayoutPct: payoutPctByTier[tier],
+  }));
+}
 
 const MS_PER_MONTH = 30.44 * 24 * 60 * 60 * 1000;
 
@@ -56,8 +82,8 @@ export interface ClaimResult {
 export async function claimToVesting(userId: string, amount: number, lockTier: VestingLockTier): Promise<ClaimResult> {
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "Enter a valid amount." };
 
-  const config = LOCK_TIER_CONFIG[lockTier];
-  if (!config) return { ok: false, error: "Invalid lock term." };
+  const tierMonths = LOCK_TIER_MONTHS[lockTier];
+  if (!tierMonths) return { ok: false, error: "Invalid lock term." };
 
   const claimable = await getClaimableAxisBalance(userId);
   if (amount > claimable) {
@@ -65,12 +91,13 @@ export async function claimToVesting(userId: string, amount: number, lockTier: V
   }
 
   const prisma = getPrisma();
-  const mpm = await getMiningPowerMultiplier(userId);
-  const effectivePayoutPct = Math.min(1, config.basePayoutPct * mpm);
+  const [mpm, options] = await Promise.all([getMiningPowerMultiplier(userId), getLockTierOptions()]);
+  const basePayoutPct = options.find((o) => o.tier === lockTier)!.basePayoutPct;
+  const effectivePayoutPct = Math.min(1, basePayoutPct * mpm);
   const payoutAmount = amount * effectivePayoutPct;
 
   await prisma.axisClaimVestingSchedule.create({
-    data: { userId, grossAmount: amount, payoutAmount, lockTier, lockMonths: config.months },
+    data: { userId, grossAmount: amount, payoutAmount, lockTier, lockMonths: tierMonths.months },
   });
 
   return { ok: true, payoutAmount, effectivePayoutPct };
