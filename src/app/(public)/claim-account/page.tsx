@@ -4,19 +4,21 @@ import { Suspense, useActionState } from "react";
 import { useSearchParams } from "next/navigation";
 import { acceptAccountClaim } from "@/app/actions/auth";
 
-function AcceptInviteForm() {
+function ClaimAccountForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const [state, action, pending] = useActionState(acceptAccountClaim, undefined);
 
   if (!token) {
-    return <p className="p-note">This invite link is missing its token.</p>;
+    return <p className="p-note">This link is missing its token.</p>;
   }
 
   return (
     <form action={action}>
       <h1 className="h2 mb-2">Set your password</h1>
-      <p className="p-note mb-5">Activate your Loan Consultant account on AlphasAxis.</p>
+      <p className="p-note mb-5">
+        Activate your AlphasAxis account to track your case and start earning points.
+      </p>
       <input type="hidden" name="token" value={token} />
       <div className="field">
         <label htmlFor="password">New password</label>
@@ -30,10 +32,10 @@ function AcceptInviteForm() {
   );
 }
 
-export default function ConsultantInvitePage() {
+export default function ClaimAccountPage() {
   return (
     <Suspense fallback={null}>
-      <AcceptInviteForm />
+      <ClaimAccountForm />
     </Suspense>
   );
 }

@@ -8,11 +8,14 @@ export function ReferralCodeBox({ code }: { code: string }) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [canNativeShare, setCanNativeShare] = useState(false);
   const [link, setLink] = useState("");
+  const [leadLink, setLeadLink] = useState("");
+  const [leadCopied, setLeadCopied] = useState(false);
 
   useEffect(() => {
     const origin = window.location.origin;
     const referralLink = `${origin}/register?ref=${code}`;
     setLink(referralLink);
+    setLeadLink(`https://alphasaxis.com/?ref=${code}`);
     setCanNativeShare(typeof navigator.share === "function");
     QRCode.toDataURL(referralLink, { margin: 1, width: 240, color: { dark: "#0F0D0A", light: "#FCF8F1" } })
       .then(setQrDataUrl)
@@ -23,6 +26,12 @@ export function ReferralCodeBox({ code }: { code: string }) {
     await navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
+  }
+
+  async function copyLeadLink() {
+    await navigator.clipboard.writeText(leadLink);
+    setLeadCopied(true);
+    setTimeout(() => setLeadCopied(false), 1800);
   }
 
   async function share() {
@@ -55,6 +64,15 @@ export function ReferralCodeBox({ code }: { code: string }) {
       >
         <span>{code}</span>
         <span className="text-gold-light">{copied ? "Copied!" : "Copy link"}</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={copyLeadLink}
+        className="mt-2 flex w-full cursor-pointer items-center justify-between rounded-[10px] border border-[var(--gold-border)] bg-[var(--card2)] px-3 py-2.5 text-[12px] text-white"
+      >
+        <span>Marketing-site link (for leads)</span>
+        <span className="text-gold-light">{leadCopied ? "Copied!" : "Copy link"}</span>
       </button>
 
       {qrDataUrl && (

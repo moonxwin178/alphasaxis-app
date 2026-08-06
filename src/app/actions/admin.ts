@@ -9,7 +9,7 @@ import { computeCommissionDistribution } from "@/lib/commissionEngine";
 import { resolveBrokerageTier, resolveUplineRecipientId } from "@/lib/commissionResolve";
 import { sendNotificationEmail } from "@/lib/email";
 import { generateUniqueReferralCode } from "@/lib/referral";
-import { createConsultantInviteToken } from "@/lib/inviteToken";
+import { createInviteToken } from "@/lib/inviteToken";
 import { EMAIL_PATTERN, stripControlChars } from "@/lib/apiSecurity";
 import { getMiningConfig, rmToAxis } from "@/lib/miningConfig";
 import { createNodeVesting, runVestingBatch } from "@/lib/axisPrestigeVesting";
@@ -53,7 +53,7 @@ export async function inviteLoanConsultant(name: string, email: string): Promise
     },
   });
 
-  const token = await createConsultantInviteToken(consultant.id);
+  const token = await createInviteToken(consultant.id, "consultant-invite");
   await sendNotificationEmail(
     cleanEmail,
     "You're invited as a Loan Consultant — AlphasAxis",
