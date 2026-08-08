@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
@@ -32,7 +33,7 @@ export default async function ConsultantPipelinePage() {
         {cases.map((c) => {
           const yourCommission = c.commissionLines.reduce((sum, l) => sum + Number(l.amount), 0);
           return (
-            <div key={c.id} className="card !mb-0 mb-3">
+            <Link key={c.id} href={`/consultant/pipeline/${c.id}`} className="card !mb-0 mb-3 block">
               <p className="eyebrow">Case #{c.id.slice(0, 8).toUpperCase()}</p>
               <p className="row-title mb-1 text-[15px]">
                 {FINANCING_LABEL[c.financingType]} — RM {Number(c.amount).toLocaleString()}
@@ -47,7 +48,7 @@ export default async function ConsultantPipelinePage() {
                   Your commission: RM {yourCommission.toLocaleString()}
                 </p>
               )}
-            </div>
+            </Link>
           );
         })}
       </div>
