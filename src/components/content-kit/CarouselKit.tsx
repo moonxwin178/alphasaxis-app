@@ -3,34 +3,36 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { AXISPRESTIGE_TOPIC } from "@/lib/contentKit/topics";
-import {
-  CANVAS_W,
-  CANVAS_H,
-  drawSlide,
-  loadFonts,
-  loadImage,
-  type DrawSlideAssets,
-} from "@/lib/contentKit/prestigeTemplate";
+import { CANVAS_W, CANVAS_H, loadImage, loadFonts } from "@/lib/contentKit/canvasCore";
+import { STYLES, type DrawSlideAssets } from "@/lib/contentKit/styles";
 
 const SLIDE_LABELS = ["Cover", "Problem", "What We Are", "Get Started"];
 
-export function PrestigeCarouselKit({ code }: { code: string }) {
+interface LoadedAssets {
+  coinImg: HTMLImageElement;
+  logoDark: HTMLImageElement;
+  logoLight: HTMLImageElement;
+}
+
+export function CarouselKit({ code }: { code: string }) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [ready, setReady] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const assetsRef = useRef<{ coinImg: HTMLImageElement; logoImg: HTMLImageElement } | null>(null);
+  const [styleId, setStyleId] = useState(STYLES[0].id);
+  const assetsRef = useRef<LoadedAssets | null>(null);
 
   // Load fonts + static images once.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [, coinImg, logoImg] = await Promise.all([
+      const [, coinImg, logoDark, logoLight] = await Promise.all([
         loadFonts(),
         loadImage("/nft/token.png"),
         loadImage("/logo.png"),
+        loadImage("/logo-bronze.png"),
       ]);
       if (cancelled) return;
-      assetsRef.current = { coinImg, logoImg };
+      assetsRef.current = { coinImg, logoDark, logoLight };
       setReady(true);
     })();
     return () => {
@@ -38,10 +40,11 @@ export function PrestigeCarouselKit({ code }: { code: string }) {
     };
   }, []);
 
-  // Redraw all 4 slides whenever assets are ready or the referral code changes.
+  // Redraw all 4 slides whenever assets are ready, the code changes, or the style changes.
   useEffect(() => {
     if (!ready || !assetsRef.current) return;
 
+    const style = STYLES.find((s) => s.id === styleId) ?? STYLES[0];
     const link = `https://alphasaxis.com/?ref=${code}`;
     let cancelled = false;
 
@@ -49,19 +52,23 @@ export function PrestigeCarouselKit({ code }: { code: string }) {
       .then((qrDataUrl) => loadImage(qrDataUrl))
       .then((qrImg) => {
         if (cancelled || !assetsRef.current) return;
-        const assets: DrawSlideAssets = { ...assetsRef.current, qrImg };
+        const assets: DrawSlideAssets = {
+          coinImg: assetsRef.current.coinImg,
+          logoImg: style.ground === "light" ? assetsRef.current.logoLight : assetsRef.current.logoDark,
+          qrImg,
+        };
         AXISPRESTIGE_TOPIC.slides.forEach((slide, i) => {
           const canvas = canvasRefs.current[i];
           const ctx = canvas?.getContext("2d");
           if (!ctx) return;
-          drawSlide(ctx, i, slide, AXISPRESTIGE_TOPIC.handle, assets);
+          style.drawSlide(ctx, i, slide, AXISPRESTIGE_TOPIC.handle, assets);
         });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [ready, code]);
+  }, [ready, code, styleId]);
 
   function downloadSlide(index: number) {
     const canvas = canvasRefs.current[index];
@@ -71,7 +78,7 @@ export function PrestigeCarouselKit({ code }: { code: string }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `alphasaxis-prestige-${index + 1}.png`;
+      a.download = `alphasaxis-${styleId}-${index + 1}.png`;
       a.click();
       URL.revokeObjectURL(url);
     }, "image/png");
@@ -88,8 +95,21 @@ export function PrestigeCarouselKit({ code }: { code: string }) {
 
   return (
     <div>
+      <div className="tabstrip">
+        {STYLES.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className={s.id === styleId ? "active" : ""}
+            onClick={() => setStyleId(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       <div className="mb-3 flex items-center justify-between">
-        <p className="eyebrow !mb-0">PRESTIGE · AxisPrestige</p>
+        <p className="eyebrow !mb-0">{STYLES.find((s) => s.id === styleId)?.label} · AxisPrestige</p>
         <button type="button" onClick={downloadAll} disabled={!ready || downloading} className="btn primary !mb-0 !w-auto px-4">
           {downloading ? "Downloading…" : "Download All"}
         </button>
