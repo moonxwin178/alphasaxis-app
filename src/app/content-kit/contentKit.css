@@ -1,0 +1,28 @@
+/* Dedicated font faces for the Content Kit's canvas renderer.
+   next/font/local emits a build-hashed family name for the site's own
+   Visby usage, which canvas code can't reference directly — this
+   declares the same font files under a plain, stable family name. */
+
+@font-face {
+  font-family: "Visby Canvas";
+  src: url("/fonts/Visby-300.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Visby Canvas";
+  src: url("/fonts/Visby-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Visby Canvas";
+  src: url("/fonts/Visby-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: block;
+}
