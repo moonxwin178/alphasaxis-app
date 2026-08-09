@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PersonalizationBar } from "./PersonalizationBar";
 import { PrestigeCarouselKit } from "./PrestigeCarouselKit";
+import { CaptionBank } from "./CaptionBank";
 
 export function ContentKitBody({ initialCode }: { initialCode: string }) {
   const [code, setCode] = useState(initialCode);
@@ -11,6 +12,7 @@ export function ContentKitBody({ initialCode }: { initialCode: string }) {
     <div className="flex flex-col gap-4">
       <PersonalizationBar code={code} onCodeChange={setCode} />
       <PrestigeCarouselKit code={code} />
+      <CaptionBank code={code} />
     </div>
   );
 }
