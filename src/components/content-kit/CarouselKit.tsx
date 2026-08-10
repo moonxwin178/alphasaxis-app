@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { AXISPRESTIGE_TOPIC } from "@/lib/contentKit/topics";
+import type { Topic } from "@/lib/contentKit/topics";
 import { CANVAS_W, CANVAS_H, loadImage, loadFonts } from "@/lib/contentKit/canvasCore";
 import { STYLES, type DrawSlideAssets } from "@/lib/contentKit/styles";
 
@@ -14,7 +14,7 @@ interface LoadedAssets {
   logoLight: HTMLImageElement;
 }
 
-export function CarouselKit({ code }: { code: string }) {
+export function CarouselKit({ code, topic }: { code: string; topic: Topic }) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [ready, setReady] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -57,18 +57,18 @@ export function CarouselKit({ code }: { code: string }) {
           logoImg: style.ground === "light" ? assetsRef.current.logoLight : assetsRef.current.logoDark,
           qrImg,
         };
-        AXISPRESTIGE_TOPIC.slides.forEach((slide, i) => {
+        topic.slides.forEach((slide, i) => {
           const canvas = canvasRefs.current[i];
           const ctx = canvas?.getContext("2d");
           if (!ctx) return;
-          style.drawSlide(ctx, i, slide, AXISPRESTIGE_TOPIC.handle, assets);
+          style.drawSlide(ctx, i, slide, topic.handle, assets);
         });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [ready, code, styleId]);
+  }, [ready, code, styleId, topic]);
 
   function downloadSlide(index: number) {
     const canvas = canvasRefs.current[index];
@@ -78,7 +78,7 @@ export function CarouselKit({ code }: { code: string }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `alphasaxis-${styleId}-${index + 1}.png`;
+      a.download = `alphasaxis-${topic.slug}-${styleId}-${index + 1}.png`;
       a.click();
       URL.revokeObjectURL(url);
     }, "image/png");
@@ -109,7 +109,7 @@ export function CarouselKit({ code }: { code: string }) {
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <p className="eyebrow !mb-0">{STYLES.find((s) => s.id === styleId)?.label} · AxisPrestige</p>
+        <p className="eyebrow !mb-0">{STYLES.find((s) => s.id === styleId)?.label} · {topic.label}</p>
         <button type="button" onClick={downloadAll} disabled={!ready || downloading} className="btn primary !mb-0 !w-auto px-4">
           {downloading ? "Downloading…" : "Download All"}
         </button>

@@ -9,12 +9,14 @@ export interface SlideContent {
 
 export interface Topic {
   slug: string;
+  label: string;
   handle: string;
   slides: [SlideContent, SlideContent, SlideContent, SlideContent];
 }
 
 export const AXISPRESTIGE_TOPIC: Topic = {
   slug: "axisprestige",
+  label: "AxisPrestige",
   handle: "@alphasaxis",
   slides: [
     {
@@ -51,3 +53,85 @@ export const AXISPRESTIGE_TOPIC: Topic = {
     },
   ],
 };
+
+export const AXIS_TOKEN_TOPIC: Topic = {
+  slug: "axis-token",
+  label: "$AXIS Token",
+  handle: "@alphasaxis",
+  slides: [
+    {
+      eyebrow: "The Utility Token",
+      headline: "Real revenue backs the $AXIS token.",
+      keyPhrase: "$AXIS token",
+      body: ["Not a speculative coin — a utility token tied to an actual brokerage business."],
+    },
+    {
+      eyebrow: "The Problem With Most Tokens",
+      headline: "Most tokens launch before there's a business.",
+      keyPhrase: "before there's a business",
+      body: [
+        "Price charts with nothing behind them.",
+        "Utility promised, rarely delivered.",
+        "Value dependent entirely on new buyers.",
+      ],
+    },
+    {
+      eyebrow: "What $AXIS Is",
+      headline: "A utility token for a real ecosystem.",
+      keyPhrase: "real ecosystem",
+      body: [
+        "Powers rewards across the AlphasAxis platform.",
+        "Earned through real activity — cases, referrals, engagement.",
+        "Backed by an operating brokerage business.",
+      ],
+    },
+    {
+      eyebrow: "Learn More",
+      headline: "Scan to understand $AXIS.",
+      keyPhrase: "$AXIS",
+      body: ["Educational. Not financial advice."],
+    },
+  ],
+};
+
+export const MEMBERSHIP_TOPIC: Topic = {
+  slug: "membership",
+  label: "Membership Tiers",
+  handle: "@alphasaxis",
+  slides: [
+    {
+      eyebrow: "Membership Tiers",
+      headline: "Four tiers. One growing ecosystem.",
+      keyPhrase: "One growing ecosystem",
+      body: ["AxisZero to AxisPrestige — access that scales with your involvement."],
+    },
+    {
+      eyebrow: "One Size Doesn't Fit All",
+      headline: "Most platforms treat everyone the same.",
+      keyPhrase: "treat everyone the same",
+      body: [
+        "New members and power users get identical access.",
+        "No path to grow your standing over time.",
+        "Engagement isn't recognized or rewarded.",
+      ],
+    },
+    {
+      eyebrow: "How Tiers Work",
+      headline: "Four tiers, each unlocking more.",
+      keyPhrase: "each unlocking more",
+      body: [
+        "AxisZero, AxisOne, AxisPro, AxisPrestige.",
+        "Higher tiers unlock deeper ecosystem access.",
+        "Your tier reflects your involvement in the platform.",
+      ],
+    },
+    {
+      eyebrow: "Find Your Tier",
+      headline: "Scan to see where you fit.",
+      keyPhrase: "where you fit",
+      body: ["Educational. Not financial advice."],
+    },
+  ],
+};
+
+export const TOPICS: Topic[] = [AXISPRESTIGE_TOPIC, AXIS_TOKEN_TOPIC, MEMBERSHIP_TOPIC];

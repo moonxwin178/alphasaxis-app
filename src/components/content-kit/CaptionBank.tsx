@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CAPTION_BANK } from "@/lib/contentKit/captions";
 
-const TOPIC = "axisprestige";
-
-export function CaptionBank({ code }: { code: string }) {
-  const categories = CAPTION_BANK[TOPIC];
-  const [activeId, setActiveId] = useState(categories[0].id);
+export function CaptionBank({ code, topicSlug }: { code: string; topicSlug: string }) {
+  const categories = CAPTION_BANK[topicSlug] ?? [];
+  const [activeId, setActiveId] = useState(categories[0]?.id ?? "");
   const [shownByCategory, setShownByCategory] = useState<Record<string, number>>(() =>
     Object.fromEntries(categories.map((c) => [c.id, 0]))
   );
@@ -16,14 +14,23 @@ export function CaptionBank({ code }: { code: string }) {
   );
   const [copied, setCopied] = useState(false);
 
-  const active = categories.find((c) => c.id === activeId)!;
+  // Topic changed — this component's categories/captions are entirely different, reset selection state.
+  useEffect(() => {
+    setActiveId(categories[0]?.id ?? "");
+    setShownByCategory(Object.fromEntries(categories.map((c) => [c.id, 0])));
+    setUsedByCategory(Object.fromEntries(categories.map((c) => [c.id, new Set<number>([0])])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicSlug]);
+
+  const active = categories.find((c) => c.id === activeId);
   const link = `https://alphasaxis.com/?ref=${code}`;
-  const captionIndex = shownByCategory[activeId];
-  const text = active.captions[captionIndex].text.replace("{LINK}", link);
+  const captionIndex = shownByCategory[activeId] ?? 0;
+  const text = active ? active.captions[captionIndex].text.replace("{LINK}", link) : "";
 
   function showAnother() {
+    if (!active) return;
     const total = active.captions.length;
-    const used = usedByCategory[activeId];
+    const used = usedByCategory[activeId] ?? new Set<number>();
     let pool = Array.from({ length: total }, (_, i) => i).filter((i) => !used.has(i));
 
     // Category exhausted — reshuffle, but never immediately repeat the caption just shown.
@@ -43,6 +50,8 @@ export function CaptionBank({ code }: { code: string }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }
+
+  if (!active) return null;
 
   return (
     <div className="card !mb-0">
