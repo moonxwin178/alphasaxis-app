@@ -133,4 +133,42 @@ export const CAPTION_BANK: Record<string, CaptionCategory[]> = {
       ],
     },
   ],
+  earn: [
+    {
+      id: "brand",
+      label: "Brand",
+      captions: [
+        { id: "b1", text: "5 minutes a day. Real rewards. That's the AlphasAxis Earn hub. {LINK}" },
+        { id: "b2", text: "Most apps waste your time. AlphasAxis pays you for yours. {LINK}" },
+        { id: "b3", text: "Spend, submit, refer, share — it all counts on AlphasAxis. {LINK}" },
+      ],
+    },
+    {
+      id: "problem",
+      label: "The Gap",
+      captions: [
+        { id: "p1", text: "You scroll, you share, you refer — for free, everywhere else. {LINK}" },
+        { id: "p2", text: "Your attention has value. Most platforms just take it. {LINK}" },
+        { id: "p3", text: "Loyalty deserves more than a badge. AlphasAxis actually pays it. {LINK}" },
+      ],
+    },
+    {
+      id: "how-it-works",
+      label: "How It Works",
+      captions: [
+        { id: "h1", text: "Spend-to-Earn: upload a receipt from a partner brand, earn points. {LINK}" },
+        { id: "h2", text: "Submit-to-Earn: hit simple case milestones, get rewarded. {LINK}" },
+        { id: "h3", text: "Network & Social: invite friends, follow, engage — it all earns. {LINK}" },
+      ],
+    },
+    {
+      id: "cta",
+      label: "Get Started",
+      captions: [
+        { id: "c1", text: "Takes 5 minutes to start. Scan and see what you can earn today. {LINK}" },
+        { id: "c2", text: "Your first task is one tap away. {LINK}" },
+        { id: "c3", text: "Not financial advice — just a rewards system worth trying. {LINK}" },
+      ],
+    },
+  ],
 };

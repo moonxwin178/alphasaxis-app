@@ -86,6 +86,14 @@ const icons = {
       <path d="M12 9v5M12 17v.3" />
     </svg>
   ),
+  grid: (
+    <svg viewBox="0 0 24 24" {...ICON_STROKE}>
+      <rect x="3" y="3" width="8" height="8" rx="1.5" />
+      <rect x="13" y="3" width="8" height="8" rx="1.5" />
+      <rect x="3" y="13" width="8" height="8" rx="1.5" />
+      <rect x="13" y="13" width="8" height="8" rx="1.5" />
+    </svg>
+  ),
 };
 
 export const USER_TABS: TabDef[] = [
@@ -93,6 +101,7 @@ export const USER_TABS: TabDef[] = [
   { href: "/earn", label: "Earn", icon: icons.coins },
   { href: "/market", label: "Market", icon: icons.shop },
   { href: "/wallet", label: "Wallet", icon: icons.wallet },
+  { href: "/content-kit", label: "Kit", icon: icons.grid },
   { href: "/profile", label: "Profile", icon: icons.user },
 ];
 
@@ -101,6 +110,7 @@ export const AGENT_TABS: TabDef[] = [
   { href: "/agent/docs", label: "Docs", icon: icons.doc },
   { href: "/agent/earn", label: "Earn", icon: icons.coins },
   { href: "/agent/score", label: "Score", icon: icons.chart },
+  { href: "/content-kit", label: "Kit", icon: icons.grid },
 ];
 
 export const AGENCY_TABS: TabDef[] = [
@@ -112,6 +122,7 @@ export const AGENCY_TABS: TabDef[] = [
 
 export const CONSULTANT_TABS: TabDef[] = [
   { href: "/consultant/pipeline", label: "Pipeline", icon: icons.pipeline },
+  { href: "/content-kit", label: "Kit", icon: icons.grid },
   { href: "/consultant/profile", label: "Profile", icon: icons.user },
 ];
 

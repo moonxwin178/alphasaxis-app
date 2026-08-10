@@ -134,4 +134,44 @@ export const MEMBERSHIP_TOPIC: Topic = {
   ],
 };
 
-export const TOPICS: Topic[] = [AXISPRESTIGE_TOPIC, AXIS_TOKEN_TOPIC, MEMBERSHIP_TOPIC];
+export const EARN_TOPIC: Topic = {
+  slug: "earn",
+  label: "Earn Tasks",
+  handle: "@alphasaxis",
+  slides: [
+    {
+      eyebrow: "Earn On AlphasAxis",
+      headline: "Turn 5 minutes into real rewards.",
+      keyPhrase: "real rewards",
+      body: ["Spend, submit, refer, share — every action earns you points on AlphasAxis."],
+    },
+    {
+      eyebrow: "Most Apps Give You Nothing",
+      headline: "Most apps take your time for free.",
+      keyPhrase: "for free",
+      body: [
+        "Scrolling, sharing, referring — normally unpaid.",
+        "Your attention has value. Most platforms just keep it.",
+        "AlphasAxis pays you back for showing up.",
+      ],
+    },
+    {
+      eyebrow: "Four Ways To Earn",
+      headline: "Four simple ways to start earning.",
+      keyPhrase: "start earning",
+      body: [
+        "Spend-to-Earn — upload receipts from partner brands.",
+        "Submit-to-Earn — complete simple case milestones.",
+        "Network & Social — invite friends, follow, engage.",
+      ],
+    },
+    {
+      eyebrow: "Start Today",
+      headline: "Scan and start earning now.",
+      keyPhrase: "earning now",
+      body: ["Educational. Not financial advice."],
+    },
+  ],
+};
+
+export const TOPICS: Topic[] = [AXISPRESTIGE_TOPIC, AXIS_TOKEN_TOPIC, MEMBERSHIP_TOPIC, EARN_TOPIC];

@@ -53,6 +53,9 @@ export function CaptionBank({ code, topicSlug }: { code: string; topicSlug: stri
 
   if (!active) return null;
 
+  const whatsappHref = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  const xHref = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+
   return (
     <div className="card !mb-0">
       <p className="row-title mb-2">Caption bank</p>
@@ -69,7 +72,7 @@ export function CaptionBank({ code, topicSlug }: { code: string; topicSlug: stri
         ))}
       </div>
       <p className="p-note !mb-3">{text}</p>
-      <div className="grid2">
+      <div className="grid2 mb-2.5">
         <button type="button" onClick={copy} className="btn secondary !mb-0">
           {copied ? "Copied!" : "Copy caption"}
         </button>
@@ -77,6 +80,15 @@ export function CaptionBank({ code, topicSlug }: { code: string; topicSlug: stri
           Show me another
         </button>
       </div>
+      <div className="grid2">
+        <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="btn secondary !mb-0">
+          WhatsApp
+        </a>
+        <a href={xHref} target="_blank" rel="noopener noreferrer" className="btn secondary !mb-0">
+          X
+        </a>
+      </div>
+      <p className="p-note mt-2 !mb-0">For Instagram or TikTok, use the Share button on a slide above, or copy the caption in here.</p>
     </div>
   );
 }

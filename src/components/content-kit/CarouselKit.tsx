@@ -70,6 +70,10 @@ export function CarouselKit({ code, topic }: { code: string; topic: Topic }) {
     };
   }, [ready, code, styleId, topic]);
 
+  function slideFilename(index: number) {
+    return `alphasaxis-${topic.slug}-${styleId}-${index + 1}.png`;
+  }
+
   function downloadSlide(index: number) {
     const canvas = canvasRefs.current[index];
     if (!canvas) return;
@@ -78,9 +82,32 @@ export function CarouselKit({ code, topic }: { code: string; topic: Topic }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `alphasaxis-${topic.slug}-${styleId}-${index + 1}.png`;
+      a.download = slideFilename(index);
       a.click();
       URL.revokeObjectURL(url);
+    }, "image/png");
+  }
+
+  function shareSlide(index: number) {
+    const canvas = canvasRefs.current[index];
+    if (!canvas) return;
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const file = new File([blob], slideFilename(index), { type: "image/png" });
+
+      // Web Share API with a file opens the OS share sheet (IG, TikTok, WhatsApp,
+      // X, Messages, etc. all show up there on mobile) -- there's no direct web
+      // deep-link for sharing an image straight into IG/TikTok, so this is the
+      // real path for those two.
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "AlphasAxis", text: `${topic.label} — ${SLIDE_LABELS[index]}` });
+        } catch {
+          // user cancelled the share sheet — nothing to do
+        }
+      } else {
+        downloadSlide(index);
+      }
     }, "image/png");
   }
 
@@ -131,14 +158,24 @@ export function CarouselKit({ code, topic }: { code: string; topic: Topic }) {
                 style={{ width: "100%", height: "100%", display: "block" }}
               />
             </div>
-            <button
-              type="button"
-              onClick={() => downloadSlide(i)}
-              disabled={!ready}
-              className="btn secondary !mb-0"
-            >
-              {label} — Download
-            </button>
+            <div className="grid2">
+              <button
+                type="button"
+                onClick={() => downloadSlide(i)}
+                disabled={!ready}
+                className="btn secondary !mb-0"
+              >
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={() => shareSlide(i)}
+                disabled={!ready}
+                className="btn primary !mb-0"
+              >
+                Share
+              </button>
+            </div>
           </div>
         ))}
       </div>
