@@ -6,6 +6,7 @@ import type { Topic, Lang } from "@/lib/contentKit/topics";
 import { CANVAS_W, CANVAS_H, loadImage, loadFonts } from "@/lib/contentKit/canvasCore";
 import { STYLES, type DrawSlideAssets } from "@/lib/contentKit/styles";
 import { UI_STRINGS } from "@/lib/contentKit/uiStrings";
+import { PosterEditor } from "./PosterEditor";
 
 const SLIDE_LABELS = ["Cover", "Problem", "What We Are", "Get Started"];
 
@@ -21,7 +22,9 @@ export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic;
   const [ready, setReady] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [styleId, setStyleId] = useState(STYLES[0].id);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const assetsRef = useRef<LoadedAssets | null>(null);
+  const drawAssetsRef = useRef<DrawSlideAssets | null>(null);
 
   // Load fonts + static images once.
   useEffect(() => {
@@ -59,6 +62,7 @@ export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic;
           logoImg: style.ground === "light" ? assetsRef.current.logoLight : assetsRef.current.logoDark,
           qrImg,
         };
+        drawAssetsRef.current = assets;
         topic.slidesByLang[lang].forEach((slide, i) => {
           const canvas = canvasRefs.current[i];
           const ctx = canvas?.getContext("2d");
@@ -160,6 +164,14 @@ export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic;
                 style={{ width: "100%", height: "100%", display: "block" }}
               />
             </div>
+            <button
+              type="button"
+              onClick={() => setEditingIndex(i)}
+              disabled={!ready}
+              className="btn primary !mb-0"
+            >
+              {t.edit}
+            </button>
             <div className="grid2">
               <button
                 type="button"
@@ -173,7 +185,7 @@ export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic;
                 type="button"
                 onClick={() => shareSlide(i)}
                 disabled={!ready}
-                className="btn primary !mb-0"
+                className="btn secondary !mb-0"
               >
                 {t.share}
               </button>
@@ -183,6 +195,19 @@ export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic;
       </div>
 
       {!ready && <p className="p-note mt-3">{t.loadingAssets}</p>}
+
+      {editingIndex !== null && drawAssetsRef.current && (
+        <PosterEditor
+          styleId={styleId}
+          slideIndex={editingIndex}
+          content={topic.slidesByLang[lang][editingIndex]}
+          handle={topic.handle}
+          lang={lang}
+          assets={drawAssetsRef.current}
+          filenameBase={slideFilename(editingIndex).replace(/\.png$/, "")}
+          onClose={() => setEditingIndex(null)}
+        />
+      )}
     </div>
   );
 }

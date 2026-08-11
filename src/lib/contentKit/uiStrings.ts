@@ -16,6 +16,15 @@ export interface ContentKitUiStrings {
   copyCaption: string;
   showMeAnother: string;
   igTikTokNote: string;
+  edit: string;
+  close: string;
+  undo: string;
+  redo: string;
+  reset: string;
+  addText: string;
+  addImage: string;
+  delete: string;
+  duplicate: string;
 }
 
 export const UI_STRINGS: Record<Lang, ContentKitUiStrings> = {
@@ -35,6 +44,15 @@ export const UI_STRINGS: Record<Lang, ContentKitUiStrings> = {
     copyCaption: "Copy caption",
     showMeAnother: "Show me another",
     igTikTokNote: "For Instagram or TikTok, use the Share button on a slide above, or copy the caption in here.",
+    edit: "Edit",
+    close: "Close",
+    undo: "Undo",
+    redo: "Redo",
+    reset: "Reset",
+    addText: "+ Text",
+    addImage: "+ Image",
+    delete: "Delete",
+    duplicate: "Duplicate",
   },
   zh: {
     language: "语言",
@@ -52,6 +70,15 @@ export const UI_STRINGS: Record<Lang, ContentKitUiStrings> = {
     copyCaption: "复制文案",
     showMeAnother: "换一个",
     igTikTokNote: "如需分享到Instagram或TikTok，请使用上方幻灯片的分享按钮，或在此处复制文案。",
+    edit: "编辑",
+    close: "关闭",
+    undo: "撤销",
+    redo: "重做",
+    reset: "重置",
+    addText: "+ 文字",
+    addImage: "+ 图片",
+    delete: "删除",
+    duplicate: "复制",
   },
   bm: {
     language: "Bahasa",
@@ -69,5 +96,14 @@ export const UI_STRINGS: Record<Lang, ContentKitUiStrings> = {
     copyCaption: "Salin kapsyen",
     showMeAnother: "Tunjukkan satu lagi",
     igTikTokNote: "Untuk Instagram atau TikTok, guna butang Kongsi pada slaid di atas, atau salin kapsyen di sini.",
+    edit: "Sunting",
+    close: "Tutup",
+    undo: "Buat Asal",
+    redo: "Buat Semula",
+    reset: "Set Semula",
+    addText: "+ Teks",
+    addImage: "+ Imej",
+    delete: "Padam",
+    duplicate: "Gandakan",
   },
 };

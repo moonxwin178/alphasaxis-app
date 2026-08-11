@@ -166,6 +166,16 @@ export function drawGradientHeadline(
   return cursorY;
 }
 
+/** The short gold tick mark above the eyebrow label. Decorative, so it's also drawn standalone by each style's background. */
+export function drawEyebrowTick(ctx: CanvasRenderingContext2D, x: number, y: number, lineColor: string): void {
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + 44, y);
+  ctx.stroke();
+}
+
 export function drawEyebrow(
   ctx: CanvasRenderingContext2D,
   label: string,
@@ -175,12 +185,7 @@ export function drawEyebrow(
   textColor: string,
   lang: Lang = "en"
 ): void {
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + 44, y);
-  ctx.stroke();
+  drawEyebrowTick(ctx, x, y, lineColor);
 
   const fontSize = 26;
   ctx.font = font(600, fontSize, lang);
@@ -222,17 +227,12 @@ export function drawFaintGlow(ctx: CanvasRenderingContext2D, color: string, alph
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 }
 
-export function drawHeroCoin(
-  ctx: CanvasRenderingContext2D,
-  coinImg: HTMLImageElement,
-  haloColorHex: string,
-  haloAlpha = 0.32
-): void {
-  const cx = 780;
-  const cy = 950;
-  const size = 352;
-  const R = Math.round(size * 0.95);
+export const HERO_COIN_POS = { cx: 780, cy: 950, size: 352 };
 
+/** The radial glow behind the hero coin. Decorative, so it's also drawn standalone by each style's background. */
+export function drawHeroCoinHalo(ctx: CanvasRenderingContext2D, haloColorHex: string, haloAlpha = 0.32): void {
+  const { cx, cy, size } = HERO_COIN_POS;
+  const R = Math.round(size * 0.95);
   const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
   halo.addColorStop(0, hexToRgba(haloColorHex, haloAlpha));
   halo.addColorStop(1, hexToRgba(haloColorHex, 0));
@@ -240,7 +240,16 @@ export function drawHeroCoin(
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.fill();
+}
 
+export function drawHeroCoin(
+  ctx: CanvasRenderingContext2D,
+  coinImg: HTMLImageElement,
+  haloColorHex: string,
+  haloAlpha = 0.32
+): void {
+  const { cx, cy, size } = HERO_COIN_POS;
+  drawHeroCoinHalo(ctx, haloColorHex, haloAlpha);
   ctx.drawImage(coinImg, cx - size / 2, cy - size / 2, size, size);
 }
 
@@ -341,11 +350,23 @@ export function drawSubLines(
   return sy;
 }
 
-const SCAN_LABEL: Record<Lang, string> = {
+export const SCAN_LABEL: Record<Lang, string> = {
   en: "SCAN TO GET STARTED",
   zh: "扫码立即开始",
   bm: "IMBAS UNTUK MULA",
 };
+
+export const QR_CARD_POS = { cardW: 420, cardH: 420, cardX: (CANVAS_W - 420) / 2, cardY: 760, qrSize: 260 };
+
+/** The bordered card frame behind the QR code. Decorative, so it's also drawn standalone by each style's background. */
+export function drawQrCardFrame(ctx: CanvasRenderingContext2D, borderColor: string): void {
+  const { cardW, cardH, cardX, cardY } = QR_CARD_POS;
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, 20);
+  ctx.stroke();
+}
 
 export function drawQrCard(
   ctx: CanvasRenderingContext2D,
@@ -354,17 +375,9 @@ export function drawQrCard(
   labelColor: string,
   lang: Lang = "en"
 ): void {
-  const cardW = 420;
-  const cardH = 420;
-  const cardX = (CANVAS_W - cardW) / 2;
-  const cardY = 760;
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(cardX, cardY, cardW, cardH, 20);
-  ctx.stroke();
+  const { cardW, cardX, cardY, qrSize } = QR_CARD_POS;
+  drawQrCardFrame(ctx, borderColor);
 
-  const qrSize = 260;
   ctx.drawImage(qrImg, cardX + (cardW - qrSize) / 2, cardY + 34, qrSize, qrSize);
 
   ctx.font = font(600, 22, lang);

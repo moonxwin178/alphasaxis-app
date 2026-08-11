@@ -4,17 +4,21 @@ import {
   CANVAS_H,
   MX,
   type Lang,
+  type Tokens,
   readTokens,
   hexToRgba,
   font,
   drawGradientHeadline,
   drawEyebrow,
+  drawEyebrowTick,
   drawHairlineFrame,
   drawHeroCoin,
+  drawHeroCoinHalo,
   drawFooter,
   drawBullets,
   drawSubLines,
   drawQrCard,
+  drawQrCardFrame,
 } from "./canvasCore";
 
 export interface DrawSlideAssets {
@@ -48,6 +52,19 @@ function drawArcAccent(ctx: CanvasRenderingContext2D, color: string): void {
   ctx.fill();
 }
 
+/** Decorative-only preamble (no content), reused by drawSlide and by the poster editor to seed a background layer. */
+export function drawBackground(ctx: CanvasRenderingContext2D, tokens: Tokens, _lang: Lang, slideIndex: number): void {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = tokens.black;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  drawGhostNumeral(ctx, slideIndex, tokens.gold);
+  drawHairlineFrame(ctx, tokens.goldBorder);
+  drawArcAccent(ctx, tokens.gold);
+  drawEyebrowTick(ctx, MX, 172, tokens.gold);
+  if (slideIndex === 0) drawHeroCoinHalo(ctx, tokens.gold);
+  if (slideIndex === 3) drawQrCardFrame(ctx, tokens.goldBorder);
+}
+
 export function drawSlide(
   ctx: CanvasRenderingContext2D,
   slideIndex: number,
@@ -59,12 +76,7 @@ export function drawSlide(
   const tokens = readTokens();
   const contentWidth = CANVAS_W - MX * 2;
 
-  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-  ctx.fillStyle = tokens.black;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-  drawGhostNumeral(ctx, slideIndex, tokens.gold);
-  drawHairlineFrame(ctx, tokens.goldBorder);
-  drawArcAccent(ctx, tokens.gold);
+  drawBackground(ctx, tokens, lang, slideIndex);
 
   drawEyebrow(ctx, content.eyebrow, MX, 172, tokens.gold, tokens.goldLight, lang);
 

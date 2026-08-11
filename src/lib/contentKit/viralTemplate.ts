@@ -4,17 +4,21 @@ import {
   CANVAS_H,
   MX,
   type Lang,
+  type Tokens,
   readTokens,
   font,
   wrapWords,
   findKeyPhraseRange,
   drawEyebrow,
+  drawEyebrowTick,
   drawHairlineFrame,
   drawHeroCoin,
+  drawHeroCoinHalo,
   drawFooter,
   drawBullets,
   drawSubLines,
   drawQrCard,
+  drawQrCardFrame,
 } from "./canvasCore";
 
 export interface DrawSlideAssets {
@@ -25,6 +29,7 @@ export interface DrawSlideAssets {
 
 const SIZE = 80;
 const LINE_HEIGHT = 90;
+const BLACK = "#1A1206";
 
 /** Headline where the key phrase sits on a solid gold highlight block with black text, rest in white. */
 function drawHighlightHeadline(
@@ -120,6 +125,18 @@ function drawPill(ctx: CanvasRenderingContext2D, text: string, gold: string, bla
   ctx.fillText(text, x + padX, y + h / 2 + 1);
 }
 
+/** Decorative-only preamble (no content), reused by drawSlide and by the poster editor to seed a background layer. */
+export function drawBackground(ctx: CanvasRenderingContext2D, tokens: Tokens, lang: Lang, slideIndex: number): void {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = tokens.black;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  drawHairlineFrame(ctx, tokens.goldBorder);
+  drawPill(ctx, slideIndex === 3 ? PILL_TEXT[lang].follow : PILL_TEXT[lang].swipe, tokens.gold, BLACK, lang);
+  drawEyebrowTick(ctx, MX, 172, tokens.gold);
+  if (slideIndex === 0) drawHeroCoinHalo(ctx, tokens.gold);
+  if (slideIndex === 3) drawQrCardFrame(ctx, tokens.goldBorder);
+}
+
 export function drawSlide(
   ctx: CanvasRenderingContext2D,
   slideIndex: number,
@@ -130,15 +147,10 @@ export function drawSlide(
 ): void {
   const tokens = readTokens();
   const contentWidth = CANVAS_W - MX * 2;
-  const black = "#1A1206";
 
-  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-  ctx.fillStyle = tokens.black;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-  drawHairlineFrame(ctx, tokens.goldBorder);
+  drawBackground(ctx, tokens, lang, slideIndex);
 
   drawEyebrow(ctx, content.eyebrow, MX, 172, tokens.gold, tokens.goldLight, lang);
-  drawPill(ctx, slideIndex === 3 ? PILL_TEXT[lang].follow : PILL_TEXT[lang].swipe, tokens.gold, black, lang);
 
   const headlineBottom = drawHighlightHeadline(
     ctx,
@@ -148,7 +160,7 @@ export function drawSlide(
     280,
     contentWidth,
     tokens.gold,
-    black,
+    BLACK,
     tokens.white,
     lang
   );
