@@ -169,9 +169,14 @@ export function drawEyebrow(
   // A literal double-space join looks crude at this weight/size — this
   // replicates true per-character tracking instead.
   const tracking = fontSize * 0.12;
+  const wordGap = fontSize * 0.42;
   const ty = y + 42;
   let cursorX = x;
   for (const ch of label.toUpperCase()) {
+    if (ch === " ") {
+      cursorX += wordGap;
+      continue;
+    }
     ctx.fillText(ch, cursorX, ty);
     cursorX += ctx.measureText(ch).width + tracking;
   }
