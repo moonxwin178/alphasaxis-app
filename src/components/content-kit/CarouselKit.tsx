@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import type { Topic, Lang } from "@/lib/contentKit/topics";
 import { CANVAS_W, CANVAS_H, loadImage, loadFonts } from "@/lib/contentKit/canvasCore";
 import { STYLES, type DrawSlideAssets } from "@/lib/contentKit/styles";
+import { UI_STRINGS } from "@/lib/contentKit/uiStrings";
 
 const SLIDE_LABELS = ["Cover", "Problem", "What We Are", "Get Started"];
 
@@ -15,6 +16,7 @@ interface LoadedAssets {
 }
 
 export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic; lang: Lang }) {
+  const t = UI_STRINGS[lang];
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [ready, setReady] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -138,7 +140,7 @@ export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic;
       <div className="mb-3 flex items-center justify-between">
         <p className="eyebrow !mb-0">{STYLES.find((s) => s.id === styleId)?.label} · {topic.label}</p>
         <button type="button" onClick={downloadAll} disabled={!ready || downloading} className="btn primary !mb-0 !w-auto px-4">
-          {downloading ? "Downloading…" : "Download All"}
+          {downloading ? t.downloading : t.downloadAll}
         </button>
       </div>
 
@@ -165,7 +167,7 @@ export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic;
                 disabled={!ready}
                 className="btn secondary !mb-0"
               >
-                Download
+                {t.download}
               </button>
               <button
                 type="button"
@@ -173,14 +175,14 @@ export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic;
                 disabled={!ready}
                 className="btn primary !mb-0"
               >
-                Share
+                {t.share}
               </button>
             </div>
           </div>
         ))}
       </div>
 
-      {!ready && <p className="p-note mt-3">Loading fonts and assets…</p>}
+      {!ready && <p className="p-note mt-3">{t.loadingAssets}</p>}
     </div>
   );
 }

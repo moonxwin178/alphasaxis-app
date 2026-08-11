@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { CAPTION_BANK } from "@/lib/contentKit/captions";
 import type { Lang } from "@/lib/contentKit/topics";
+import { UI_STRINGS } from "@/lib/contentKit/uiStrings";
 
 export function CaptionBank({ code, topicSlug, lang }: { code: string; topicSlug: string; lang: Lang }) {
+  const t = UI_STRINGS[lang];
   const categories = CAPTION_BANK[lang][topicSlug] ?? [];
   const [activeId, setActiveId] = useState(categories[0]?.id ?? "");
   const [shownByCategory, setShownByCategory] = useState<Record<string, number>>(() =>
@@ -59,7 +61,7 @@ export function CaptionBank({ code, topicSlug, lang }: { code: string; topicSlug
 
   return (
     <div className="card !mb-0">
-      <p className="row-title mb-2">Caption bank</p>
+      <p className="row-title mb-2">{t.captionBank}</p>
       <div className="tabstrip">
         {categories.map((c) => (
           <button
@@ -75,10 +77,10 @@ export function CaptionBank({ code, topicSlug, lang }: { code: string; topicSlug
       <p className="p-note !mb-3">{text}</p>
       <div className="grid2 mb-2.5">
         <button type="button" onClick={copy} className="btn secondary !mb-0">
-          {copied ? "Copied!" : "Copy caption"}
+          {copied ? t.copied : t.copyCaption}
         </button>
         <button type="button" onClick={showAnother} className="btn secondary !mb-0">
-          Show me another
+          {t.showMeAnother}
         </button>
       </div>
       <div className="grid2">
@@ -89,7 +91,7 @@ export function CaptionBank({ code, topicSlug, lang }: { code: string; topicSlug
           X
         </a>
       </div>
-      <p className="p-note mt-2 !mb-0">For Instagram or TikTok, use the Share button on a slide above, or copy the caption in here.</p>
+      <p className="p-note mt-2 !mb-0">{t.igTikTokNote}</p>
     </div>
   );
 }

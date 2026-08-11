@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { TOPICS, type Lang } from "@/lib/contentKit/topics";
+import { UI_STRINGS } from "@/lib/contentKit/uiStrings";
 import { PersonalizationBar } from "./PersonalizationBar";
 import { CarouselKit } from "./CarouselKit";
 import { CaptionBank } from "./CaptionBank";
@@ -17,13 +18,14 @@ export function ContentKitBody({ initialCode }: { initialCode: string }) {
   const [topicSlug, setTopicSlug] = useState(TOPICS[0].slug);
   const [lang, setLang] = useState<Lang>("en");
   const topic = TOPICS.find((t) => t.slug === topicSlug) ?? TOPICS[0];
+  const t = UI_STRINGS[lang];
 
   return (
     <div className="flex flex-col gap-4">
-      <PersonalizationBar code={code} onCodeChange={setCode} />
+      <PersonalizationBar code={code} onCodeChange={setCode} lang={lang} />
 
       <div>
-        <p className="row-title mb-2">Language</p>
+        <p className="row-title mb-2">{t.language}</p>
         <div className="tabstrip">
           {LANGUAGES.map((l) => (
             <button
@@ -39,7 +41,7 @@ export function ContentKitBody({ initialCode }: { initialCode: string }) {
       </div>
 
       <div>
-        <p className="row-title mb-2">Topic</p>
+        <p className="row-title mb-2">{t.topic}</p>
         <div className="tabstrip">
           {TOPICS.map((t) => (
             <button
