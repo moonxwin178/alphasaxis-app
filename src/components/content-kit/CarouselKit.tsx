@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import type { Topic } from "@/lib/contentKit/topics";
+import type { Topic, Lang } from "@/lib/contentKit/topics";
 import { CANVAS_W, CANVAS_H, loadImage, loadFonts } from "@/lib/contentKit/canvasCore";
 import { STYLES, type DrawSlideAssets } from "@/lib/contentKit/styles";
 
@@ -14,7 +14,7 @@ interface LoadedAssets {
   logoLight: HTMLImageElement;
 }
 
-export function CarouselKit({ code, topic }: { code: string; topic: Topic }) {
+export function CarouselKit({ code, topic, lang }: { code: string; topic: Topic; lang: Lang }) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const [ready, setReady] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -57,21 +57,21 @@ export function CarouselKit({ code, topic }: { code: string; topic: Topic }) {
           logoImg: style.ground === "light" ? assetsRef.current.logoLight : assetsRef.current.logoDark,
           qrImg,
         };
-        topic.slides.forEach((slide, i) => {
+        topic.slidesByLang[lang].forEach((slide, i) => {
           const canvas = canvasRefs.current[i];
           const ctx = canvas?.getContext("2d");
           if (!ctx) return;
-          style.drawSlide(ctx, i, slide, topic.handle, assets);
+          style.drawSlide(ctx, i, slide, topic.handle, lang, assets);
         });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [ready, code, styleId, topic]);
+  }, [ready, code, styleId, topic, lang]);
 
   function slideFilename(index: number) {
-    return `alphasaxis-${topic.slug}-${styleId}-${index + 1}.png`;
+    return `alphasaxis-${topic.slug}-${styleId}-${lang}-${index + 1}.png`;
   }
 
   function downloadSlide(index: number) {

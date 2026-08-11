@@ -2,7 +2,18 @@ export const CANVAS_W = 1080;
 export const CANVAS_H = 1350;
 export const MX = 110;
 
+export type Lang = "en" | "zh" | "bm";
+
 const FONT_FAMILY = "Visby Canvas";
+// Visby has no CJK glyphs. There's no practical way to bundle a full-coverage
+// CJK display font, so Chinese slides fall back to the best-quality system
+// CJK stack instead -- present on every major OS/mobile platform.
+const FONT_FAMILY_ZH = '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Heiti SC", sans-serif';
+
+/** Chinese text has no spaces between words, so it wraps/tracks per-character rather than per-word. */
+function isCharWrap(lang: Lang): boolean {
+  return lang === "zh";
+}
 
 export interface Tokens {
   black: string;
@@ -48,8 +59,9 @@ export async function loadFonts(): Promise<void> {
   ]);
 }
 
-export function font(weight: number, size: number): string {
-  return `${weight} ${size}px "${FONT_FAMILY}"`;
+export function font(weight: number, size: number, lang: Lang = "en"): string {
+  const family = lang === "zh" ? FONT_FAMILY_ZH : `"${FONT_FAMILY}"`;
+  return `${weight} ${size}px ${family}`;
 }
 
 export function hexToRgba(hex: string, alpha: number): string {
@@ -60,31 +72,39 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-/** Word-wrap `text` to `maxWidth` at the given font, returning lines as word arrays. */
-export function wrapWords(ctx: CanvasRenderingContext2D, text: string, fontStr: string, maxWidth: number): string[][] {
+/** Word-wrap `text` to `maxWidth` at the given font, returning lines as word (or, for zh, character) arrays. */
+export function wrapWords(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  fontStr: string,
+  maxWidth: number,
+  lang: Lang = "en"
+): string[][] {
   ctx.font = fontStr;
-  const words = text.split(" ");
+  const units = isCharWrap(lang) ? Array.from(text) : text.split(" ");
+  const joiner = isCharWrap(lang) ? "" : " ";
   const lines: string[][] = [[]];
-  for (const word of words) {
+  for (const unit of units) {
     const current = lines[lines.length - 1];
-    const trial = [...current, word].join(" ");
+    const trial = [...current, unit].join(joiner);
     if (current.length > 0 && ctx.measureText(trial).width > maxWidth) {
-      lines.push([word]);
+      lines.push([unit]);
     } else {
-      current.push(word);
+      current.push(unit);
     }
   }
   return lines;
 }
 
-/** Word index range of `keyPhrase` within `flat`, ignoring trailing punctuation. Returns [-1,-1] if not found. */
-export function findKeyPhraseRange(flat: string[], keyPhrase: string): [number, number] {
+/** Index range of `keyPhrase` within `flat` (words, or characters for zh), ignoring trailing punctuation. Returns [-1,-1] if not found. */
+export function findKeyPhraseRange(flat: string[], keyPhrase: string, lang: Lang = "en"): [number, number] {
   const stripPunct = (w: string) => w.replace(/[.,!?;:]+$/, "");
-  const keyWords = keyPhrase.split(" ").map(stripPunct);
+  const joiner = isCharWrap(lang) ? "" : " ";
+  const keyUnits = (isCharWrap(lang) ? Array.from(keyPhrase) : keyPhrase.split(" ")).map(stripPunct);
   const flatStripped = flat.map(stripPunct);
-  for (let i = 0; i <= flatStripped.length - keyWords.length; i++) {
-    if (flatStripped.slice(i, i + keyWords.length).join(" ") === keyWords.join(" ")) {
-      return [i, i + keyWords.length - 1];
+  for (let i = 0; i <= flatStripped.length - keyUnits.length; i++) {
+    if (flatStripped.slice(i, i + keyUnits.length).join(joiner) === keyUnits.join(joiner)) {
+      return [i, i + keyUnits.length - 1];
     }
   }
   return [-1, -1];
@@ -107,12 +127,14 @@ export function drawGradientHeadline(
   x: number,
   y: number,
   maxWidth: number,
-  style: HeadlineStyle
+  style: HeadlineStyle,
+  lang: Lang = "en"
 ): number {
-  const fontStr = font(style.fontWeight, style.size);
-  const lines = wrapWords(ctx, headline, fontStr, maxWidth);
+  const fontStr = font(style.fontWeight, style.size, lang);
+  const lines = wrapWords(ctx, headline, fontStr, maxWidth, lang);
   const flat = lines.flat();
-  const [keyStart, keyEnd] = findKeyPhraseRange(flat, keyPhrase);
+  const [keyStart, keyEnd] = findKeyPhraseRange(flat, keyPhrase, lang);
+  const gap = isCharWrap(lang) ? "" : " ";
 
   ctx.font = fontStr;
   ctx.textBaseline = "alphabetic";
@@ -125,7 +147,7 @@ export function drawGradientHeadline(
     for (let i = 0; i < line.length; i++) {
       const word = line[i];
       const isKey = keyStart !== -1 && wordIndex >= keyStart && wordIndex <= keyEnd;
-      const display = word + (i < line.length - 1 ? " " : "");
+      const display = word + (i < line.length - 1 ? gap : "");
       const w = ctx.measureText(display).width;
       if (isKey) {
         const grad = ctx.createLinearGradient(cursorX, 0, cursorX + w, 0);
@@ -150,7 +172,8 @@ export function drawEyebrow(
   x: number,
   y: number,
   lineColor: string,
-  textColor: string
+  textColor: string,
+  lang: Lang = "en"
 ): void {
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 3;
@@ -160,7 +183,7 @@ export function drawEyebrow(
   ctx.stroke();
 
   const fontSize = 26;
-  ctx.font = font(600, fontSize);
+  ctx.font = font(600, fontSize, lang);
   ctx.fillStyle = textColor;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
@@ -253,9 +276,11 @@ export function drawBullets(
   x: number,
   y: number,
   maxWidth: number,
-  style: BulletStyle
+  style: BulletStyle,
+  lang: Lang = "en"
 ): void {
-  const fontStr = font(400, 32);
+  const fontStr = font(400, 32, lang);
+  const joiner = isCharWrap(lang) ? "" : " ";
   const lineHeight = 46;
   const rowGap = 22;
   let cursorY = y;
@@ -278,13 +303,13 @@ export function drawBullets(
       ctx.fill();
     }
 
-    const lines = wrapWords(ctx, bullet, fontStr, maxWidth - 36);
+    const lines = wrapWords(ctx, bullet, fontStr, maxWidth - 36, lang);
     ctx.font = fontStr;
     ctx.fillStyle = style.textColor;
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
     for (const line of lines) {
-      ctx.fillText(line.join(" "), x + 36, cursorY);
+      ctx.fillText(line.join(joiner), x + 36, cursorY);
       cursorY += lineHeight;
     }
     cursorY += rowGap;
@@ -298,27 +323,36 @@ export function drawSubLines(
   x: number,
   y: number,
   maxWidth: number,
-  color: string
+  color: string,
+  lang: Lang = "en"
 ): number {
-  const fontStr = font(400, 32);
-  const lines = wrapWords(ctx, text, fontStr, maxWidth);
+  const fontStr = font(400, 32, lang);
+  const joiner = isCharWrap(lang) ? "" : " ";
+  const lines = wrapWords(ctx, text, fontStr, maxWidth, lang);
   ctx.font = fontStr;
   ctx.fillStyle = color;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   let sy = y;
   for (const line of lines) {
-    ctx.fillText(line.join(" "), x, sy);
+    ctx.fillText(line.join(joiner), x, sy);
     sy += 44;
   }
   return sy;
 }
 
+const SCAN_LABEL: Record<Lang, string> = {
+  en: "SCAN TO GET STARTED",
+  zh: "扫码立即开始",
+  bm: "IMBAS UNTUK MULA",
+};
+
 export function drawQrCard(
   ctx: CanvasRenderingContext2D,
   qrImg: HTMLImageElement,
   borderColor: string,
-  labelColor: string
+  labelColor: string,
+  lang: Lang = "en"
 ): void {
   const cardW = 420;
   const cardH = 420;
@@ -333,9 +367,9 @@ export function drawQrCard(
   const qrSize = 260;
   ctx.drawImage(qrImg, cardX + (cardW - qrSize) / 2, cardY + 34, qrSize, qrSize);
 
-  ctx.font = font(600, 22);
+  ctx.font = font(600, 22, lang);
   ctx.fillStyle = labelColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText("SCAN TO GET STARTED", CANVAS_W / 2, cardY + qrSize + 70);
+  ctx.fillText(SCAN_LABEL[lang], CANVAS_W / 2, cardY + qrSize + 70);
 }

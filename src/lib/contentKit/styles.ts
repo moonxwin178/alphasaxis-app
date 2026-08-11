@@ -1,4 +1,5 @@
 import type { SlideContent } from "./topics";
+import type { Lang } from "./canvasCore";
 import * as prestige from "./prestigeTemplate";
 import * as champagne from "./champagneTemplate";
 import * as ticker from "./tickerTemplate";
@@ -16,6 +17,7 @@ export type DrawSlideFn = (
   slideIndex: number,
   content: SlideContent,
   handle: string,
+  lang: Lang,
   assets: DrawSlideAssets
 ) => void;
 

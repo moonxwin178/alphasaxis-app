@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { CAPTION_BANK } from "@/lib/contentKit/captions";
+import type { Lang } from "@/lib/contentKit/topics";
 
-export function CaptionBank({ code, topicSlug }: { code: string; topicSlug: string }) {
-  const categories = CAPTION_BANK[topicSlug] ?? [];
+export function CaptionBank({ code, topicSlug, lang }: { code: string; topicSlug: string; lang: Lang }) {
+  const categories = CAPTION_BANK[lang][topicSlug] ?? [];
   const [activeId, setActiveId] = useState(categories[0]?.id ?? "");
   const [shownByCategory, setShownByCategory] = useState<Record<string, number>>(() =>
     Object.fromEntries(categories.map((c) => [c.id, 0]))
@@ -14,13 +15,13 @@ export function CaptionBank({ code, topicSlug }: { code: string; topicSlug: stri
   );
   const [copied, setCopied] = useState(false);
 
-  // Topic changed — this component's categories/captions are entirely different, reset selection state.
+  // Topic or language changed — this component's categories/captions are entirely different, reset selection state.
   useEffect(() => {
     setActiveId(categories[0]?.id ?? "");
     setShownByCategory(Object.fromEntries(categories.map((c) => [c.id, 0])));
     setUsedByCategory(Object.fromEntries(categories.map((c) => [c.id, new Set<number>([0])])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicSlug]);
+  }, [topicSlug, lang]);
 
   const active = categories.find((c) => c.id === activeId);
   const link = `https://alphasaxis.com/?ref=${code}`;

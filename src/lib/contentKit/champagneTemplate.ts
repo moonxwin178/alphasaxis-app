@@ -3,6 +3,7 @@ import {
   CANVAS_W,
   CANVAS_H,
   MX,
+  type Lang,
   readTokens,
   drawGradientHeadline,
   drawEyebrow,
@@ -31,6 +32,7 @@ export function drawSlide(
   slideIndex: number,
   content: SlideContent,
   handle: string,
+  lang: Lang,
   assets: DrawSlideAssets
 ): void {
   const tokens = readTokens();
@@ -41,21 +43,30 @@ export function drawSlide(
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   drawHairlineFrame(ctx, BORDER);
 
-  drawEyebrow(ctx, content.eyebrow, MX, 172, tokens.goldDim, tokens.goldDim);
+  drawEyebrow(ctx, content.eyebrow, MX, 172, tokens.goldDim, tokens.goldDim, lang);
 
-  const headlineBottom = drawGradientHeadline(ctx, content.headline, content.keyPhrase, MX, 268, contentWidth, {
-    fontWeight: 300,
-    size: 76,
-    lineHeight: 82,
-    inkColor: INK,
-    gradientC0: BRONZE_C0,
-    gradientC1: BRONZE_C1,
-  });
+  const headlineBottom = drawGradientHeadline(
+    ctx,
+    content.headline,
+    content.keyPhrase,
+    MX,
+    268,
+    contentWidth,
+    {
+      fontWeight: 300,
+      size: 76,
+      lineHeight: 82,
+      inkColor: INK,
+      gradientC0: BRONZE_C0,
+      gradientC1: BRONZE_C1,
+    },
+    lang
+  );
 
   if (slideIndex === 1 || slideIndex === 2) {
-    drawBullets(ctx, content.body, MX, headlineBottom + 50, contentWidth, { markerColor: tokens.goldDim, textColor: INK_DIM });
+    drawBullets(ctx, content.body, MX, headlineBottom + 50, contentWidth, { markerColor: tokens.goldDim, textColor: INK_DIM }, lang);
   } else {
-    drawSubLines(ctx, content.body[0], MX, headlineBottom + 44, contentWidth * 0.82, INK_DIM);
+    drawSubLines(ctx, content.body[0], MX, headlineBottom + 44, contentWidth * 0.82, INK_DIM, lang);
   }
 
   if (slideIndex === 0) {
@@ -63,7 +74,7 @@ export function drawSlide(
   }
 
   if (slideIndex === 3 && assets.qrImg) {
-    drawQrCard(ctx, assets.qrImg, BORDER, tokens.goldDim);
+    drawQrCard(ctx, assets.qrImg, BORDER, tokens.goldDim, lang);
   }
 
   drawFooter(ctx, assets.logoImg, slideIndex, handle, INK_DIM);

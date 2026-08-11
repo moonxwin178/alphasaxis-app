@@ -3,6 +3,7 @@ import {
   CANVAS_W,
   CANVAS_H,
   MX,
+  type Lang,
   readTokens,
   font,
   wrapWords,
@@ -35,12 +36,14 @@ function drawHighlightHeadline(
   maxWidth: number,
   gold: string,
   black: string,
-  white: string
+  white: string,
+  lang: Lang
 ): number {
-  const fontStr = font(600, SIZE);
-  const lines = wrapWords(ctx, headline, fontStr, maxWidth);
+  const fontStr = font(600, SIZE, lang);
+  const lines = wrapWords(ctx, headline, fontStr, maxWidth, lang);
   const flat = lines.flat();
-  const [keyStart, keyEnd] = findKeyPhraseRange(flat, keyPhrase);
+  const [keyStart, keyEnd] = findKeyPhraseRange(flat, keyPhrase, lang);
+  const gap = lang === "zh" ? "" : " ";
 
   ctx.font = fontStr;
   ctx.textBaseline = "alphabetic";
@@ -55,7 +58,7 @@ function drawHighlightHeadline(
     let cursorX = x;
     const laid: Laid[] = [];
     for (let i = 0; i < line.length; i++) {
-      const display = line[i] + (i < line.length - 1 ? " " : "");
+      const display = line[i] + (i < line.length - 1 ? gap : "");
       const w = ctx.measureText(display).width;
       const isKey = keyStart !== -1 && wordIndex >= keyStart && wordIndex <= keyEnd;
       laid.push({ word: display, x: cursorX, w, isKey });
@@ -94,8 +97,14 @@ function drawHighlightHeadline(
   return rowY;
 }
 
-function drawPill(ctx: CanvasRenderingContext2D, text: string, gold: string, black: string): void {
-  ctx.font = font(600, 22);
+const PILL_TEXT: Record<Lang, { swipe: string; follow: string }> = {
+  en: { swipe: "SWIPE >", follow: "FOLLOW" },
+  zh: { swipe: "上滑 >", follow: "关注" },
+  bm: { swipe: "LELUAR >", follow: "IKUTI" },
+};
+
+function drawPill(ctx: CanvasRenderingContext2D, text: string, gold: string, black: string, lang: Lang): void {
+  ctx.font = font(600, 22, lang);
   const padX = 20;
   const w = ctx.measureText(text).width + padX * 2;
   const h = 44;
@@ -116,6 +125,7 @@ export function drawSlide(
   slideIndex: number,
   content: SlideContent,
   handle: string,
+  lang: Lang,
   assets: DrawSlideAssets
 ): void {
   const tokens = readTokens();
@@ -127,8 +137,8 @@ export function drawSlide(
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   drawHairlineFrame(ctx, tokens.goldBorder);
 
-  drawEyebrow(ctx, content.eyebrow, MX, 172, tokens.gold, tokens.goldLight);
-  drawPill(ctx, slideIndex === 3 ? "FOLLOW" : "SWIPE >", tokens.gold, black);
+  drawEyebrow(ctx, content.eyebrow, MX, 172, tokens.gold, tokens.goldLight, lang);
+  drawPill(ctx, slideIndex === 3 ? PILL_TEXT[lang].follow : PILL_TEXT[lang].swipe, tokens.gold, black, lang);
 
   const headlineBottom = drawHighlightHeadline(
     ctx,
@@ -139,17 +149,26 @@ export function drawSlide(
     contentWidth,
     tokens.gold,
     black,
-    tokens.white
+    tokens.white,
+    lang
   );
 
   if (slideIndex === 1 || slideIndex === 2) {
-    drawBullets(ctx, content.body, MX, headlineBottom + 50, contentWidth, {
-      markerColor: tokens.gold,
-      textColor: tokens.dim,
-      marker: "tick",
-    });
+    drawBullets(
+      ctx,
+      content.body,
+      MX,
+      headlineBottom + 50,
+      contentWidth,
+      {
+        markerColor: tokens.gold,
+        textColor: tokens.dim,
+        marker: "tick",
+      },
+      lang
+    );
   } else {
-    drawSubLines(ctx, content.body[0], MX, headlineBottom + 44, contentWidth * 0.82, tokens.dim);
+    drawSubLines(ctx, content.body[0], MX, headlineBottom + 44, contentWidth * 0.82, tokens.dim, lang);
   }
 
   if (slideIndex === 0) {
@@ -157,7 +176,7 @@ export function drawSlide(
   }
 
   if (slideIndex === 3 && assets.qrImg) {
-    drawQrCard(ctx, assets.qrImg, tokens.goldBorder, tokens.goldLight);
+    drawQrCard(ctx, assets.qrImg, tokens.goldBorder, tokens.goldLight, lang);
   }
 
   drawFooter(ctx, assets.logoImg, slideIndex, handle, tokens.dim);

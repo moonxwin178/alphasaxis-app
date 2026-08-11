@@ -3,6 +3,7 @@ import {
   CANVAS_W,
   CANVAS_H,
   MX,
+  type Lang,
   readTokens,
   hexToRgba,
   drawGradientHeadline,
@@ -22,8 +23,15 @@ export interface DrawSlideAssets {
 }
 
 const MONO = '"SFMono-Regular", Consolas, monospace';
+const CJK_MONO = '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif';
 
-function drawTickerStrip(ctx: CanvasRenderingContext2D, goldLight: string, goldBorder: string): void {
+const TICKER_UNIT: Record<Lang, string> = {
+  en: "$AXIS  ·  EDUCATIONAL CONTENT  ·  ",
+  zh: "$AXIS  ·  教育内容  ·  ",
+  bm: "$AXIS  ·  KANDUNGAN PENDIDIKAN  ·  ",
+};
+
+function drawTickerStrip(ctx: CanvasRenderingContext2D, goldLight: string, goldBorder: string, lang: Lang): void {
   const y = 90;
   ctx.strokeStyle = goldBorder;
   ctx.lineWidth = 1;
@@ -34,11 +42,11 @@ function drawTickerStrip(ctx: CanvasRenderingContext2D, goldLight: string, goldB
   ctx.lineTo(CANVAS_W - MX, y + 12);
   ctx.stroke();
 
-  ctx.font = `12px ${MONO}`;
+  ctx.font = lang === "zh" ? `12px ${CJK_MONO}` : `12px ${MONO}`;
   ctx.fillStyle = goldLight;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  const unit = "$AXIS  ·  EDUCATIONAL CONTENT  ·  ";
+  const unit = TICKER_UNIT[lang];
   const unitWidth = ctx.measureText(unit).width;
   const repeats = Math.ceil((CANVAS_W - MX * 2) / unitWidth) + 1;
   ctx.save();
@@ -93,6 +101,7 @@ export function drawSlide(
   slideIndex: number,
   content: SlideContent,
   handle: string,
+  lang: Lang,
   assets: DrawSlideAssets
 ): void {
   const tokens = readTokens();
@@ -104,24 +113,33 @@ export function drawSlide(
   drawFaintGlow(ctx, tokens.gold, 0.07);
   drawGrid(ctx, tokens.gold);
   drawHairlineFrame(ctx, tokens.goldBorder);
-  drawTickerStrip(ctx, tokens.goldLight, tokens.goldBorder);
+  drawTickerStrip(ctx, tokens.goldLight, tokens.goldBorder, lang);
   drawRisingChart(ctx, tokens.gold);
 
-  drawEyebrow(ctx, content.eyebrow, MX, 220, tokens.gold, tokens.goldLight);
+  drawEyebrow(ctx, content.eyebrow, MX, 220, tokens.gold, tokens.goldLight, lang);
 
-  const headlineBottom = drawGradientHeadline(ctx, content.headline, content.keyPhrase, MX, 316, contentWidth, {
-    fontWeight: 300,
-    size: 72,
-    lineHeight: 78,
-    inkColor: tokens.white,
-    gradientC0: tokens.goldLight,
-    gradientC1: tokens.gold,
-  });
+  const headlineBottom = drawGradientHeadline(
+    ctx,
+    content.headline,
+    content.keyPhrase,
+    MX,
+    316,
+    contentWidth,
+    {
+      fontWeight: 300,
+      size: 72,
+      lineHeight: 78,
+      inkColor: tokens.white,
+      gradientC0: tokens.goldLight,
+      gradientC1: tokens.gold,
+    },
+    lang
+  );
 
   if (slideIndex === 1 || slideIndex === 2) {
-    drawBullets(ctx, content.body, MX, headlineBottom + 46, contentWidth, { markerColor: tokens.gold, textColor: tokens.dim });
+    drawBullets(ctx, content.body, MX, headlineBottom + 46, contentWidth, { markerColor: tokens.gold, textColor: tokens.dim }, lang);
   } else {
-    drawSubLines(ctx, content.body[0], MX, headlineBottom + 40, contentWidth * 0.82, tokens.dim);
+    drawSubLines(ctx, content.body[0], MX, headlineBottom + 40, contentWidth * 0.82, tokens.dim, lang);
   }
 
   if (slideIndex === 0) {
@@ -129,7 +147,7 @@ export function drawSlide(
   }
 
   if (slideIndex === 3 && assets.qrImg) {
-    drawQrCard(ctx, assets.qrImg, tokens.goldBorder, tokens.goldLight);
+    drawQrCard(ctx, assets.qrImg, tokens.goldBorder, tokens.goldLight, lang);
   }
 
   // Footer with a monospace index, per the style's signature.
