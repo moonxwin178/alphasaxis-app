@@ -159,12 +159,22 @@ export function drawEyebrow(
   ctx.lineTo(x + 44, y);
   ctx.stroke();
 
-  ctx.font = font(600, 26);
+  const fontSize = 26;
+  ctx.font = font(600, fontSize);
   ctx.fillStyle = textColor;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  const spaced = label.toUpperCase().split("").join("  ");
-  ctx.fillText(spaced, x, y + 42);
+
+  // Matches the real .eyebrow CSS class (globals.css): letter-spacing 0.12em.
+  // A literal double-space join looks crude at this weight/size — this
+  // replicates true per-character tracking instead.
+  const tracking = fontSize * 0.12;
+  const ty = y + 42;
+  let cursorX = x;
+  for (const ch of label.toUpperCase()) {
+    ctx.fillText(ch, cursorX, ty);
+    cursorX += ctx.measureText(ch).width + tracking;
+  }
 }
 
 export function drawHairlineFrame(ctx: CanvasRenderingContext2D, borderColor: string): void {
