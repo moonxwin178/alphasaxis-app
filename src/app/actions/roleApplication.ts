@@ -11,7 +11,7 @@ import { payMintWithAxis, MINT_PRICE_AXIS } from "@/lib/mintCycle";
 import { getLiquidAxisBalance } from "@/lib/axisClaimVesting";
 import type { NftTier, PrismaClient, Role } from "@/generated/prisma/client";
 
-export type RoleAppFormState = { error?: string } | undefined;
+export type RoleAppFormState = { error?: string; agentActivated?: boolean } | undefined;
 
 const TIER_FOR_ROLE: Record<"AGENT" | "AGENCY", NftTier> = {
   AGENT: "AXIS_ONE",
@@ -151,6 +151,9 @@ export async function applyForRole(
         });
         await grantMembershipCore(tx, user.id, "AGENT", null);
       });
+      revalidatePath("/profile");
+      revalidatePath("/wallet");
+      return { agentActivated: true };
     } else {
       const balance = await getLiquidAxisBalance(user.id);
       if (balance < MINT_PRICE_AXIS.AGENCY) {
@@ -177,6 +180,9 @@ export async function applyForRole(
         });
         await grantMembership(tx, user.id, "AGENT", null);
       });
+      revalidatePath("/profile");
+      revalidatePath("/wallet");
+      return { agentActivated: true };
     } else {
       // Fee is committed now; refunded automatically if an admin rejects.
       await prisma.$transaction(async (tx) => {

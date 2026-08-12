@@ -183,6 +183,7 @@ model User {
   email         String    @unique
   passwordHash  String
   name          String
+  displayName   String?
   phone         String?
   role          Role      @default(USER)
   referralCode  String    @unique

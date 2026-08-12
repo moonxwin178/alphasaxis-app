@@ -5,13 +5,16 @@ import { useActionState, useState } from "react";
 import { applyForRole } from "@/app/actions/roleApplication";
 import { MEMBERSHIP_PRICE_USDT } from "@/lib/membership";
 import { MINT_PRICE_AXIS } from "@/lib/mintPricing";
+import { MilestoneShareCard } from "@/components/content-kit/MilestoneShareCard";
 
 export function RoleApplicationForm({
   walletBalance,
   axisBalance,
+  code,
 }: {
   walletBalance: number;
   axisBalance: number;
+  code: string;
 }) {
   const [state, action, pending] = useActionState(applyForRole, undefined);
   const [role, setRole] = useState<"AGENT" | "AGENCY">("AGENT");
@@ -20,6 +23,18 @@ export function RoleApplicationForm({
   const usdPrice = MEMBERSHIP_PRICE_USDT[role];
   const axisPrice = MINT_PRICE_AXIS[role];
   const canAfford = paymentMethod === "WALLET" ? walletBalance >= usdPrice : axisBalance >= axisPrice;
+
+  if (state?.agentActivated) {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="card !mb-0">
+          <p className="row-title mb-1">You&apos;re now an Agent 🎉</p>
+          <p className="p-note !mb-0">AxisOne is active — refresh to see it reflected across the app.</p>
+        </div>
+        <MilestoneShareCard code={code} kind="tier-upgrade" data={{ tier: "AXIS_ONE" }} />
+      </div>
+    );
+  }
 
   return (
     <form action={action} className="card">

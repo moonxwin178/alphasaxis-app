@@ -9,6 +9,7 @@ import { TierRing } from "@/components/TierRing";
 import { TIER_LABEL, TIER_MULTIPLIER } from "@/lib/commission";
 import { getWalletBalance } from "@/lib/wallet";
 import { PhoneEditRow } from "@/components/PhoneEditRow";
+import { DisplayNameEditRow } from "@/components/DisplayNameEditRow";
 import { computeVestedTokens } from "@/lib/axisPrestigeVesting";
 import { getLiquidAxisBalance } from "@/lib/axisClaimVesting";
 
@@ -118,6 +119,7 @@ export default async function ProfilePage() {
             </Link>
           )}
           <PhoneEditRow phone={self.phone} />
+          <DisplayNameEditRow displayName={self.displayName} fallback={`Agent ${self.referralCode.slice(-4)}`} />
         </div>
 
         <div>
@@ -177,7 +179,7 @@ export default async function ProfilePage() {
               </p>
             </div>
           ) : (
-            <RoleApplicationForm walletBalance={walletBalance} axisBalance={axisBalance} />
+            <RoleApplicationForm walletBalance={walletBalance} axisBalance={axisBalance} code={self.referralCode} />
           )}
         </div>
 

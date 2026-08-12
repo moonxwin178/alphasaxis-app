@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import { getPrisma } from "@/lib/prisma";
 import { AppHeader } from "@/components/AppHeader";
 import { ReferralCodeBox } from "@/components/ReferralCodeBox";
-import { ClaimMilestoneButton } from "@/components/ClaimMilestoneButton";
+import { MilestoneRow } from "@/components/MilestoneRow";
 import { getReferralMilestoneStatus } from "@/lib/referralMilestones";
 
 export default async function EarnNetworkPage() {
@@ -43,6 +44,24 @@ export default async function EarnNetworkPage() {
           </div>
         </div>
 
+        <Link href="/leaderboard" target="_blank" className="row">
+          <div className="row-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
+              <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z" />
+              <path d="M7 6H4a3 3 0 0 0 3 3M17 6h3a3 3 0 0 1-3 3" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="row-title">Public leaderboard</p>
+            <p className="row-sub">See how you rank against other referrers</p>
+          </div>
+          <div className="chev">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </div>
+        </Link>
+
         <div className="card !mb-0">
           <p className="row-title mb-1">Earn on every Agent/Agency mint</p>
           <p className="p-note !mb-0">
@@ -57,20 +76,17 @@ export default async function EarnNetworkPage() {
             Paid as claimable $AXIS — lock it into a term at Agent2Mine to make it spendable.
           </p>
           {milestones.map((m) => (
-            <div key={m.key} className="row">
-              <div className="row-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[17px] w-[17px]">
-                  <path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z" />
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="row-title">{m.label}</p>
-                <p className="row-sub">
-                  {Math.min(m.progress, m.threshold)}/{m.threshold} · +{m.rewardAxis.toLocaleString()} $AXIS
-                </p>
-              </div>
-              <ClaimMilestoneButton milestoneKey={m.key} eligible={m.eligible} claimed={m.claimed} />
-            </div>
+            <MilestoneRow
+              key={m.key}
+              milestoneKey={m.key}
+              label={m.label}
+              progress={m.progress}
+              threshold={m.threshold}
+              rewardAxis={m.rewardAxis}
+              eligible={m.eligible}
+              claimed={m.claimed}
+              code={self.referralCode}
+            />
           ))}
         </div>
 
